@@ -41,6 +41,7 @@ ROOT_FILES_TO_SYNC = [
     "wake_listener.py",
     "wake_word_matcher.py",
     "run.bat",
+    "runw.bat",
     "run_wake_listener.bat",
     "Uninstall.bat",
     "requirements.txt"
@@ -178,8 +179,12 @@ def create_windows_shortcuts():
     wake_bat = os.path.join(INSTALL_DIR, "run_wake_listener.bat")
     uninstall_bat = os.path.join(INSTALL_DIR, "Uninstall.bat")
 
-    # 1. Desktop Shortcut
-    desk_path = os.path.join(USERPROFILE, "Desktop", "SG CUBE.lnk")
+    # 1. Desktop Shortcut (resolves OneDrive-redirected Desktop properly)
+    try:
+        desktop_dir = shell.SpecialFolders("Desktop")
+    except Exception:
+        desktop_dir = os.path.join(USERPROFILE, "Desktop")
+    desk_path = os.path.join(desktop_dir, "SG CUBE.lnk")
     desk_link = shell.CreateShortcut(desk_path)
     desk_link.TargetPath = run_bat
     desk_link.WorkingDirectory = INSTALL_DIR
@@ -190,7 +195,11 @@ def create_windows_shortcuts():
     log("3/6", f"Desktop shortcut created: {desk_path}")
 
     # 2. Start Menu Folder & Shortcuts
-    start_menu_folder = os.path.join(APPDATA, r"Microsoft\Windows\Start Menu\Programs\SG CUBE")
+    try:
+        start_programs = shell.SpecialFolders("Programs")
+    except Exception:
+        start_programs = os.path.join(APPDATA, r"Microsoft\Windows\Start Menu\Programs")
+    start_menu_folder = os.path.join(start_programs, "SG CUBE")
     os.makedirs(start_menu_folder, exist_ok=True)
 
     # Main App in Start Menu Folder

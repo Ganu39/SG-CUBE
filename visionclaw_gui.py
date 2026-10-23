@@ -23584,8 +23584,12 @@ def main():
         except Exception:
             can_use_webview2 = False
 
+        dist_index = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist", "index.html")
         if not can_use_webview2:
             print("[LAUNCH-FALLBACK] Microsoft Edge WebView2 runtime is unavailable. Automatically falling back to Tkinter UI...")
+            use_legacy_tk = True
+        elif not os.path.exists(dist_index):
+            print("[LAUNCH-FALLBACK] Modern frontend dist not found. Automatically falling back to native Tkinter GUI...")
             use_legacy_tk = True
         else:
             try:
