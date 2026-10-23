@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #000000;
+  }
+
+  body {
+    background-color: #000000;
+    color: #FFFFFF;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+@layer components {
+  .hud-panel {
+    position: relative;
+    background-color: rgba(6, 11, 26, 0.75);
+    border: 1px solid rgba(34, 211, 238, 0.22);
+    border-radius: 6px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(34, 211, 238, 0.04);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .hud-panel-active {
+    border-color: rgba(34, 211, 238, 0.55);
+    box-shadow: 0 4px 24px rgba(34, 211, 238, 0.15), inset 0 0 16px rgba(34, 211, 238, 0.08);
+  }
+
+  .hud-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #7EA3B8;
+    font-weight: 500;
+  }
+
+  .hud-value {
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 0.875rem;
+    color: #FFFFFF;
+  }
+
+  .hud-heading {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-weight: 600;
+    color: #67E8F9;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    box-shadow: 0 0 8px currentColor;
+  }
+}
+
+@keyframes hud-ring-spawn {
+  from {
+    opacity: 0;
+    transform: scale(0.32);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.hud-ring-spawn {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: hud-ring-spawn 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes shell-flash-core {
+  0% { opacity: 0; }
+  4% { opacity: 1; }
+  12% { opacity: 0.3; }
+  18% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes shell-flash-halo {
+  0% { opacity: 0; }
+  6% { opacity: 0.8; }
+  22% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+.shell-flash-core {
+  animation: shell-flash-core 3.5s ease-out infinite;
+}
+
+.shell-flash-halo {
+  animation: shell-flash-halo 3.5s ease-out infinite;
+}

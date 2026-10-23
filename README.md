@@ -18,6 +18,7 @@ A Windows voice-first Personal AI and Assistive AI system that combines natural 
 
 [![Python Version](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Google Gemini](https://img.shields.io/badge/Google%20Gemini-Multimodal%20Live%20API-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
+[![React](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Three.js-61DAFB?style=for-the-badge&logo=react&logoColor=black)](frontend/)
 [![OpenCV](https://img.shields.io/badge/OpenCV-Computer%20Vision-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white)](https://opencv.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-Local%20Storage-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
@@ -32,6 +33,7 @@ A Windows voice-first Personal AI and Assistive AI system that combines natural 
 
 [✨ Overview](#-overview) •
 [🤖 Capabilities](#-sg-cube--personal-ai) •
+[🖥️ Presentation Layer](#️-dual-interface-presentation-layer) •
 [📱 Applications](#-applications) •
 [⚡ Advantages](#-advantages) •
 [⚠️ Limitations](#-limitations) •
@@ -40,6 +42,7 @@ A Windows voice-first Personal AI and Assistive AI system that combines natural 
 [🏗️ Architecture](#️-system-architecture) •
 [🚀 Installation](#-installation) •
 [🧪 Verification](#-testing--verification) •
+[🤝 Contributing](CONTRIBUTING.md) •
 [👥 Team](#-team--authors) •
 [📜 License](#-license)
 
@@ -51,7 +54,7 @@ A Windows voice-first Personal AI and Assistive AI system that combines natural 
 
 **SG CUBE 2.5** is an intelligent, real-time multimodal AI vision companion and assistive system designed for **accessibility, blind and low-vision autonomy, hands-free productivity, privacy, and safety**.
 
-The system unifies real-time computer vision, continuous contextual conversation, explicit personal memory, environmental scene analysis, document understanding, and permission-based Windows system automation into a single cohesive assistant that can be operated entirely by voice or visually through a modern interface.
+The system unifies real-time computer vision, continuous contextual conversation, explicit personal memory, environmental scene analysis, document understanding, and permission-based Windows system automation into a single cohesive assistant that can be operated entirely by voice or visually through a dual-mode presentation layer.
 
 ---
 
@@ -83,6 +86,22 @@ SG CUBE is a Windows voice-first Personal AI and Assistive AI system that combin
 * **Voice Authentication:** Multi-tier authorization policy with optional face recognition 2FA for protected commands.
 * **Sleep / Wake Lifecycle:** In-process dormant standby mode with single-instance IPC coordination.
 * **Single-Instance Protection:** Mutex and socket port guards preventing duplicate instances or conflicting audio devices.
+
+---
+
+# 🖥️ Dual-Interface Presentation Layer
+
+SG CUBE features a resilient, dual-mode visual presentation architecture:
+
+1. **Modern 3D Web Interface (`frontend/`):**
+   - Built with **React 18**, **TypeScript**, **Tailwind CSS**, and **Three.js** via `@react-three/fiber` and `@react-three/drei`.
+   - Features an interactive, audio-reactive 3D glass cube that reflects listening, thinking, and speaking states in real time.
+   - Communicates with the core backend through an authoritative, low-latency WebSocket bridge (`bridge_server.py`) on port `49155`.
+   - Pre-bundled in `frontend/dist/` for immediate out-of-the-box execution via Microsoft Edge WebView2 without requiring a Node.js runtime.
+
+2. **Native Assistive Fallback GUI (`visionclaw_gui.py`):**
+   - Implemented in native Python Tkinter with custom high-contrast HUD cards, rounded glass widgets, and accessibility focus management.
+   - Automatically activates if Microsoft Edge WebView2 is unavailable or if `frontend/dist` is not present, guaranteeing that the application is always functional.
 
 ---
 
@@ -233,9 +252,11 @@ graph TD
         FAILOVER["Multi-Key Automatic Failover"]
     end
 
-    subgraph OUTPUT["🤝 User Assistance"]
+    subgraph PRESENTATION["🤝 Dual Presentation Layer"]
+        BRIDGE["WebSocket Bridge Server (Port 49155)"]
+        WEBUI["React 18 + Three.js 3D Web UI"]
+        TKGUI["Native Tkinter Assistive Fallback GUI"]
         TTS["Authoritative Speech Synthesizer"]
-        GUI["Modern High-Contrast Assistive GUI"]
     end
 
     MIC --> ROUTER
@@ -266,7 +287,11 @@ graph TD
     ROUTER --> GEMINI
     GEMINI <--> FAILOVER
     GEMINI --> TTS
-    TTS --> GUI
+
+    ROUTER --> BRIDGE
+    BRIDGE --> WEBUI
+    BRIDGE -.-> TKGUI
+    TTS --> BRIDGE
 ```
 
 ---
@@ -307,9 +332,22 @@ GEMINI_API_KEY_3=your_tertiary_api_key_optional
 ```
 
 ### 4️⃣ Launch SG CUBE
-```cmd
-run.bat
-```
+* **Modern Web UI (React 18 + Three.js):**
+  ```cmd
+  python run_sgcube_web.py
+  ```
+* **Standard Desktop Launcher:**
+  ```cmd
+  run.bat
+  ```
+* **Windowless Background Launcher:**
+  ```cmd
+  runw.bat
+  ```
+* **Standby Wake Listener Daemon:**
+  ```cmd
+  run_wake_listener.bat
+  ```
 *(Or say **"SG CUBE"** if the background wake listener is active).*
 
 ---
@@ -327,6 +365,7 @@ The core application subsystems and lifecycle routines are rigorously tested usi
 * **Audio Arbitrator Handoff:** Microphone ownership handoff validated between background listener and main GUI with zero contention.
 * **Single-Instance Integrity:** Verified socket lock enforcement on IPC ports `49152`, `49153`, and `49154`.
 * **Zero Audio Duplication:** Speech synthesis queues and audio channels confirmed collision-free.
+* **Empirical Benchmarks:** Complete metrics specification available in [`SG_CUBE_Metrics_and_Evaluation_Report.pdf`](SG_CUBE_Metrics_and_Evaluation_Report.pdf).
 
 To run the targeted lifecycle and hardware regression tests:
 ```bash
@@ -344,6 +383,7 @@ pytest tests/test_sleep_wake_lifecycle.py tests/test_wake_ipc_handoff.py tests/t
 | **Release Status** | **Production Release** |
 | **Platform** | Windows 10 / 11 (64-bit) |
 | **Primary Language** | Python 3.10+ |
+| **Frontend Framework** | React 18 + TypeScript + Three.js (`@react-three/fiber`) |
 | **AI Vision & Multimodal Engine** | Google Gemini Live + Assistive Perception Suite |
 | **Local Neural Models** | OpenCV YuNet (Face Detection) + SFace (Face Recognition) |
 | **Database Architecture** | SQLite 3 with Write-Ahead Logging (WAL) & FTS5 |
@@ -358,11 +398,13 @@ pytest tests/test_sleep_wake_lifecycle.py tests/test_wake_ipc_handoff.py tests/t
 
 ### 🤝 Contributors
 * **Gajanand V Dhayagode** ([@gajanand27-05](https://github.com/gajanand27-05)) — Windows DPAPI hardware-bound security enhancements and dependencies hardening
+* **Ganesh Bukka** ([@Ganu39](https://github.com/Ganu39)) — Launcher scripts, web fallback logic, suggestions, ideas, feedback, testing, and project support
 
 ### 🤝 Team Support & Acknowledgments
 Special thanks to our teammates and collaborators for their valuable suggestions, ideas, feedback, testing support, and encouragement throughout the development of SG CUBE:
-* **Ganesh Bukka** ([@Ganu39](https://github.com/Ganu39)) — Provided valuable suggestions, ideas, feedback, and testing support.
 * **Gangadhara C** ([@gangadharac](https://github.com/gangadharac)) — Provided valuable suggestions, ideas, feedback, and overall project support.
+
+For contribution guidelines and development workflow, please read [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ---
 

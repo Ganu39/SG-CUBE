@@ -36,13 +36,18 @@ scratch_*
 test_responsiveness_fix*.py
 test_screen_reading.py
 
-# Packaging and Build artifacts
-build/
-dist/
+# Packaging and Build artifacts (root level)
+/build/
+/dist/
 *.egg-info/
 install/
 installer/
 *.spec
+
+# Frontend dependencies & build caches (dist is tracked for standalone webview runtime)
+frontend/node_modules/
+frontend/.vite/
+frontend/*.tsbuildinfo
 
 # IDE & OS files
 .vscode/
