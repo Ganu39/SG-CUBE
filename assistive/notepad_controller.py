@@ -23,6 +23,8 @@ from typing import Optional, Tuple, Dict, Any, List
 
 logger = logging.getLogger(__name__)
 
+_SILENT_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+
 # Win32 Constants
 KEYEVENTF_KEYUP = 0x0002
 KEYEVENTF_UNICODE = 0x0004
@@ -287,7 +289,7 @@ class NotepadController:
         try:
             exe_path = shutil.which("notepad.exe") or "notepad.exe"
             try:
-                subprocess.Popen([exe_path], shell=False)
+                subprocess.Popen([exe_path], shell=False, creationflags=_SILENT_FLAGS)
             except Exception as pe:
                 logger.debug("[NOTEPAD] Popen failed: %s, falling back to os.startfile", pe)
                 try:

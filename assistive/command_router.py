@@ -1698,9 +1698,9 @@ class CommandRouter:
             return {"intent": "SYSTEM_VOLUME", "target": "volume", "params": {"action": "up", "step": 10}}
         if any(p in clean_text for p in ["turn down the volume", "turn down volume", "volume down", "decrease volume", "decrease the volume", "lower the volume", "lower volume", "make it quieter"]):
             return {"intent": "SYSTEM_VOLUME", "target": "volume", "params": {"action": "down", "step": 10}}
-        if any(p in clean_text for p in ["unmute volume", "unmute the volume", "unmute audio", "unmute the audio", "unmute sound", "unmute"]):
+        if any(p in clean_text for p in ["unmute volume", "unmute the volume", "unmute audio", "unmute the audio", "unmute sound", "unmute", "turn on sound", "turn on audio"]):
             return {"intent": "SYSTEM_VOLUME", "target": "volume", "params": {"action": "unmute"}}
-        if any(p in clean_text for p in ["mute volume", "mute the volume", "mute audio", "mute the audio", "mute system", "mute sound"]) or clean_text == "mute":
+        if any(p in clean_text for p in ["mute volume", "mute the volume", "mute audio", "mute the audio", "mute system", "mute sound", "turn off sound", "turn off audio"]) or clean_text == "mute":
             if not any(w in clean_text for w in ["alert", "alerts", "notification"]):
                 return {"intent": "SYSTEM_VOLUME", "target": "volume", "params": {"action": "mute"}}
         if any(p in clean_text for p in ["what is the volume", "what's the volume", "check volume", "check the volume", "current volume"]):
@@ -1883,6 +1883,52 @@ class CommandRouter:
                     cand = ""
                 cand = re.sub(r'^(?:bluetooth\s+device|bluetooth)\s*', '', cand).strip()
                 return {"intent": "SYSTEM_BLUETOOTH", "target": cand or "bluetooth", "params": {"action": "disconnect", "device": cand}}
+
+        # C.6. Windows Dark Mode / Light Mode Control
+        if any(p in clean_text for p in [
+            "is dark mode on", "is dark mode enabled", "check dark mode", "dark mode status",
+            "what theme is active", "check theme", "is dark theme on"
+        ]):
+            return {"intent": "SYSTEM_DARK_MODE", "target": "dark_mode", "params": {"action": "status"}}
+
+        if any(p in clean_text for p in [
+            "turn on dark mode", "turn dark mode on", "enable dark mode", "switch to dark mode",
+            "activate dark mode", "dark mode on", "set dark mode", "dark theme", "enable dark theme"
+        ]):
+            return {"intent": "SYSTEM_DARK_MODE", "target": "dark_mode", "params": {"enabled": True}}
+
+        if any(p in clean_text for p in [
+            "turn off dark mode", "turn dark mode off", "disable dark mode", "turn on light mode",
+            "turn light mode on", "enable light mode", "switch to light mode", "light mode on",
+            "set light mode", "light theme", "enable light theme", "switch to light theme"
+        ]):
+            return {"intent": "SYSTEM_DARK_MODE", "target": "dark_mode", "params": {"enabled": False}}
+
+        # C.7. Sound & Master Audio Mute Control
+        if any(p in clean_text for p in [
+            "turn off sound", "turn off audio", "mute sound", "mute audio", "mute the sound",
+            "mute the audio", "mute the system", "mute system", "turn on mute", "turn mute on",
+            "mute laptop", "mute computer", "mute volume"
+        ]):
+            return {"intent": "SYSTEM_AUDIO_MUTE", "target": "audio", "params": {"muted": True}}
+
+        if any(p in clean_text for p in [
+            "turn on sound", "turn on audio", "unmute sound", "unmute audio", "unmute the sound",
+            "unmute the audio", "unmute the system", "unmute system", "turn off mute", "turn mute off",
+            "unmute laptop", "unmute computer", "unmute volume"
+        ]):
+            return {"intent": "SYSTEM_AUDIO_MUTE", "target": "audio", "params": {"muted": False}}
+
+        # C.8. Night Light Control
+        if any(p in clean_text for p in [
+            "turn on night light", "turn night light on", "enable night light", "activate night light"
+        ]):
+            return {"intent": "SYSTEM_NIGHT_LIGHT", "target": "night_light", "params": {"enabled": True}}
+
+        if any(p in clean_text for p in [
+            "turn off night light", "turn night light off", "disable night light", "deactivate night light"
+        ]):
+            return {"intent": "SYSTEM_NIGHT_LIGHT", "target": "night_light", "params": {"enabled": False}}
 
         # D. Window Management (Minimize, Maximize, Restore, Switch, App Targeting)
         if any(p in clean_text for p in ["minimize window", "minimize the window", "minimize active window", "minimize this window", "minimize this", "minimize it"]):

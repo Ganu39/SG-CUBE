@@ -192,8 +192,11 @@ class SGCubeWakeListener:
 
         if self.auto_start_enabled:
             exe_path = os.path.join(self.app_dir, "SG-CUBE-Wake-Listener.exe")
+            vbs_path = os.path.join(self.app_dir, "run_wake_listener_silent.vbs")
             if os.path.exists(exe_path):
                 win32api.RegSetValueEx(key, "SGCubeWakeListener", 0, win32con.REG_SZ, f'"{exe_path}"')
+            elif os.path.exists(vbs_path):
+                win32api.RegSetValueEx(key, "SGCubeWakeListener", 0, win32con.REG_SZ, f'wscript.exe "{vbs_path}"')
             else:
                 bat_path = os.path.join(self.app_dir, "run_wake_listener.bat")
                 win32api.RegSetValueEx(key, "SGCubeWakeListener", 0, win32con.REG_SZ, f'"{bat_path}"')
@@ -292,9 +295,10 @@ class SGCubeWakeListener:
             return
 
         time.sleep(0.1)
+        _SILENT_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         app_exe = os.path.join(self.app_dir, "SG-CUBE.exe")
         if os.path.exists(app_exe):
-            subprocess.Popen([app_exe], cwd=self.app_dir)
+            subprocess.Popen([app_exe], cwd=self.app_dir, creationflags=_SILENT_FLAGS)
         else:
             python_candidates = [
                 os.path.join(self.app_dir, "runtime", "Scripts", "pythonw.exe"),
@@ -312,7 +316,7 @@ class SGCubeWakeListener:
                     break
 
             cmd = [python_exe, os.path.join(self.app_dir, "visionclaw_gui.py")]
-            subprocess.Popen(cmd, cwd=self.app_dir)
+            subprocess.Popen(cmd, cwd=self.app_dir, creationflags=_SILENT_FLAGS)
 
         print("[MIC_OWNER] MAIN ACTIVE")
         print("[WAKE] APPLICATION READY")

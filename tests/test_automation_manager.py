@@ -218,7 +218,7 @@ class TestAutomationPermissions(unittest.TestCase):
 
     def test_default_permissions(self):
         self.assertEqual(self.mgr.get_permission(AutomationActionType.OPEN_APP), AutomationPermission.ALLOWED)
-        self.assertEqual(self.mgr.get_permission(AutomationActionType.CLOSE_APP), AutomationPermission.ASK_EACH_TIME)
+        self.assertEqual(self.mgr.get_permission(AutomationActionType.CLOSE_APP), AutomationPermission.ALLOWED)
         self.assertEqual(self.mgr.get_permission(AutomationActionType.OPEN_URL), AutomationPermission.ALLOWED)
         self.assertEqual(self.mgr.get_permission(AutomationActionType.OPEN_FOLDER), AutomationPermission.ASK_EACH_TIME)
         self.assertEqual(self.mgr.get_permission(AutomationActionType.LOCK_WORKSTATION), AutomationPermission.ASK_EACH_TIME)
@@ -259,6 +259,7 @@ class TestAutomationExecutionAndConfirmation(unittest.TestCase):
         self.assertFalse(req.requires_confirmation)
 
     def test_create_close_app_request_requires_confirmation(self):
+        self.mgr.set_permission(AutomationActionType.CLOSE_APP, AutomationPermission.ASK_EACH_TIME)
         req = self.mgr.create_request(AutomationActionType.CLOSE_APP, "calculator")
         self.assertEqual(req.action_type, AutomationActionType.CLOSE_APP)
         self.assertTrue(req.requires_confirmation)
@@ -334,7 +335,7 @@ class TestAutomationSecurityIntegration(unittest.TestCase):
         self.assertTrue(self.sec.is_configured())
         self.sec.lock_session()
 
-        req = self.mgr.create_request(AutomationActionType.CLOSE_APP, "calculator")
+        req = self.mgr.create_request(AutomationActionType.LOCK_WORKSTATION, "screen")
         self.assertTrue(req.requires_security_auth)
 
         # Attempt without authorization
@@ -552,6 +553,7 @@ class TestAutomationVisionEngineIntegration(unittest.TestCase):
         self.assertEqual(self.engine.context.active_topic, TopicType.SYSTEM_AUTOMATION)
 
     def test_vision_engine_close_app_confirmation_flow(self):
+        self.engine.automation.set_permission(AutomationActionType.CLOSE_APP, AutomationPermission.ASK_EACH_TIME)
         # 1. User says "Close calculator"
         resp1 = self.engine.process_user_speech_query("Close calculator")
         self.assertIn("Do you want me to close Calculator?", resp1)
@@ -564,6 +566,7 @@ class TestAutomationVisionEngineIntegration(unittest.TestCase):
             self.assertIn("closed Calculator", resp2)
 
     def test_vision_engine_close_app_cancel_flow(self):
+        self.engine.automation.set_permission(AutomationActionType.CLOSE_APP, AutomationPermission.ASK_EACH_TIME)
         resp1 = self.engine.process_user_speech_query("Close calculator")
         self.assertIn("Do you want me to close Calculator?", resp1)
 

@@ -22,6 +22,8 @@ from typing import Optional, Tuple, List
 
 logger = logging.getLogger(__name__)
 
+_SILENT_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+
 # Win32 Constants
 SW_HIDE = 0
 SW_NORMAL = 1
@@ -192,7 +194,7 @@ class SystemControl:
             return None
         try:
             cmd = ['powershell', '-NoProfile', '-Command', '(Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBrightness).CurrentBrightness']
-            out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=3).decode().strip()
+            out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=3, creationflags=_SILENT_FLAGS).decode().strip()
             if out.isdigit():
                 self._brightness_supported = True
                 return int(out)
@@ -221,7 +223,7 @@ class SystemControl:
 
         try:
             ps_cmd = f"Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBrightnessMethods | Invoke-CimMethod -MethodName WmiSetBrightness -Arguments @{{Timeout=1; Brightness={target_percent}}} | Out-Null"
-            subprocess.check_call(['powershell', '-NoProfile', '-Command', ps_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=4)
+            subprocess.check_call(['powershell', '-NoProfile', '-Command', ps_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=4, creationflags=_SILENT_FLAGS)
             time.sleep(0.1)
             verified = self.get_brightness()
             if verified is not None:
@@ -538,7 +540,8 @@ class SystemControl:
                         ["powershell", "-NoProfile", "-Command", "$input | Set-Clipboard"],
                         input=text.encode("utf-8"),
                         check=True,
-                        timeout=3
+                        timeout=3,
+                        creationflags=_SILENT_FLAGS
                     )
                     return True
                 except Exception:
@@ -574,7 +577,8 @@ class SystemControl:
         try:
             out = subprocess.check_output(
                 ["powershell", "-NoProfile", "-Command", "Get-Clipboard"],
-                timeout=3
+                timeout=3,
+                creationflags=_SILENT_FLAGS
             ).decode("utf-8", errors="replace").strip()
             if out:
                 return out
@@ -590,7 +594,7 @@ class SystemControl:
             return {"success": False, "state": "Error", "error": f"Script not found: {ps1_path}"}
         try:
             cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1_path, "-Action", action]
-            out = subprocess.check_output(cmd, text=True, timeout=8)
+            out = subprocess.check_output(cmd, text=True, timeout=8, creationflags=_SILENT_FLAGS)
             return json.loads(out.strip())
         except Exception as e:
             return {"success": False, "state": "Error", "error": str(e)}
@@ -654,7 +658,7 @@ class SystemControl:
             cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1_path, "-Action", action]
             if device_name:
                 cmd.extend(["-DeviceName", device_name])
-            out = subprocess.check_output(cmd, text=True, timeout=12)
+            out = subprocess.check_output(cmd, text=True, timeout=12, creationflags=_SILENT_FLAGS)
             return json.loads(out.strip())
         except Exception as e:
             return {"success": False, "state": "Error", "error": str(e)}
@@ -809,6 +813,68 @@ class SystemControl:
             err = res.get("error", "Failed to disconnect device.")
             return False, dev_name, err
 
+
+    # =========================================================================
+    # THEME & NIGHT LIGHT (Dark Mode / Personalization)
+    # =========================================================================
+
+    def get_dark_mode(self) -> Tuple[bool, Optional[bool], str]:
+        """
+        Check whether Windows Dark Mode is currently enabled.
+        Returns: (success: bool, is_dark: Optional[bool], status_message: str)
+        """
+        if os.name != "nt":
+            return False, None, "Dark mode control is only supported on Windows."
+        try:
+            import winreg
+            key_path = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ) as k:
+                val, _ = winreg.QueryValueEx(k, "AppsUseLightTheme")
+                is_dark = (val == 0)
+                state_str = "on" if is_dark else "off"
+                return True, is_dark, f"Dark mode is currently {state_str}."
+        except Exception as e:
+            return False, None, f"Could not check dark mode status: {e}"
+
+    def set_dark_mode(self, enabled: bool) -> Tuple[bool, Optional[bool], str]:
+        """
+        Toggle Windows Dark Mode on or off via Registry.
+        AppsUseLightTheme and SystemUsesLightTheme (0 = Dark, 1 = Light).
+        """
+        if os.name != "nt":
+            return False, None, "Dark mode control is only supported on Windows."
+        try:
+            import winreg
+            key_path = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+            reg_val = 0 if enabled else 1
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE) as k:
+                winreg.SetValueEx(k, "AppsUseLightTheme", 0, winreg.REG_DWORD, reg_val)
+                winreg.SetValueEx(k, "SystemUsesLightTheme", 0, winreg.REG_DWORD, reg_val)
+            # Broadcast setting change message to notify open applications
+            try:
+                HWND_BROADCAST = 0xFFFF
+                WM_SETTINGCHANGE = 0x001A
+                ctypes.windll.user32.SendMessageTimeoutW(
+                    HWND_BROADCAST, WM_SETTINGCHANGE, 0, "ImmersiveColorSet", 2, 200, None
+                )
+            except Exception:
+                pass
+            state_word = "on" if enabled else "off"
+            return True, enabled, f"Dark mode is now {state_word}."
+        except Exception as e:
+            action_word = "enable" if enabled else "disable"
+            return False, None, f"Failed to {action_word} dark mode: {e}"
+
+    def set_night_light(self, enabled: bool) -> Tuple[bool, str]:
+        """Opens Windows Night Light settings or activates quick toggle."""
+        if os.name != "nt":
+            return False, "Night light is only supported on Windows."
+        try:
+            os.startfile("ms-settings:nightlight")
+            state_word = "on" if enabled else "off"
+            return True, f"Opened Night Light settings to turn it {state_word}."
+        except Exception as e:
+            return False, f"Could not open Night Light settings: {e}"
 
 # Shared singleton instance
 _GLOBAL_SYSTEM_CONTROL = SystemControl()

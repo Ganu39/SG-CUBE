@@ -2620,6 +2620,35 @@ class VisionEngine:
             self.response_manager.add_response(resp, priority=2, force=True)
             return resp
 
+        elif intent == "SYSTEM_DARK_MODE":
+            action = route["params"].get("action")
+            if action == "status":
+                ok, is_dark, msg = self.system_control.get_dark_mode()
+                resp = msg
+            else:
+                enabled = route["params"].get("enabled", True)
+                ok, is_dark, msg = self.system_control.set_dark_mode(enabled)
+                resp = msg
+            self.response_manager.add_response(resp, priority=2, force=True)
+            return resp
+
+        elif intent == "SYSTEM_AUDIO_MUTE":
+            muted = route["params"].get("muted", True)
+            if muted:
+                ok, msg = self.system_control.mute()
+            else:
+                ok, msg = self.system_control.unmute()
+            resp = msg
+            self.response_manager.add_response(resp, priority=2, force=True)
+            return resp
+
+        elif intent == "SYSTEM_NIGHT_LIGHT":
+            enabled = route["params"].get("enabled", True)
+            ok, msg = self.system_control.set_night_light(enabled)
+            resp = msg
+            self.response_manager.add_response(resp, priority=2, force=True)
+            return resp
+
         elif intent == "SYSTEM_WINDOW_CONTROL":
             action = route["params"].get("action", "minimize")
             app_name = route["params"].get("app", "") or route.get("target", "")

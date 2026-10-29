@@ -16456,10 +16456,16 @@ class SGCubeApp:
     def _normalize_app_name(name: str) -> str:
         n = (name or "").strip().lower()
         mapping = {
-            "google chrome": "chrome",
-            "google-chrome": "chrome",
+            "google chrome": "browser",
+            "google-chrome": "browser",
+            "chrome": "browser",
+            "edge": "browser",
+            "ms edge": "browser",
+            "microsoft edge": "browser",
+            "firefox": "browser",
             "web browser": "browser",
             "internet browser": "browser",
+            "browser": "browser",
             "vs code": "vscode",
             "visual studio code": "vscode",
             "calculator": "calc",
@@ -16484,6 +16490,12 @@ class SGCubeApp:
             return "bluetooth"
         elif intent in ("BLUETOOTH_CONNECT", "BLUETOOTH_DISCONNECT", "BLUETOOTH_LIST"):
             return "bluetooth_device"
+        elif intent == "SYSTEM_DARK_MODE":
+            return "dark_mode"
+        elif intent == "SYSTEM_AUDIO_MUTE":
+            return "audio_mute"
+        elif intent == "SYSTEM_NIGHT_LIGHT":
+            return "night_light"
         elif intent == "AUTOMATION_READ_SCREEN":
             return "read_screen"
         elif intent in ("AUTOMATION_OPEN_APP", "APP_CONTROL"):

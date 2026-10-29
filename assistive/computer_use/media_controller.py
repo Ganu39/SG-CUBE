@@ -105,6 +105,13 @@ class MediaController:
 
         logger.info("[MEDIA-CONTROLLER] Playing media: '%s' on %s", clean_query, platform)
 
+        now = time.time()
+        last_query, last_time = getattr(self, "_last_play_media_guard", ("", 0.0))
+        if clean_query.lower() == last_query and (now - last_time < 4.0):
+            logger.info("[MEDIA-CONTROLLER] Duplicate play_media for '%s' within 4.0s - returning cached result", clean_query)
+            return MediaActionResult(True, "play", clean_query, f"Playing '{clean_query}' on YouTube.", True, "Duplicate command suppressed")
+        self._last_play_media_guard = (clean_query.lower(), now)
+
         # 1. Fetch YouTube search results and video IDs
         encoded = urllib.parse.quote_plus(clean_query)
         search_url = f"https://www.youtube.com/results?search_query={encoded}"
@@ -249,6 +256,13 @@ class MediaController:
         clean_query = query.strip()
         if not clean_query:
             return MediaActionResult(False, "youtube_search", None, "No search term specified for YouTube.")
+
+        now = time.time()
+        last_q, last_t = getattr(self, "_last_search_guard", ("", 0.0))
+        if clean_query.lower() == last_q and (now - last_t < 4.0):
+            logger.info("[MEDIA-CONTROLLER] Duplicate search_youtube for '%s' within 4.0s - returning cached result", clean_query)
+            return MediaActionResult(True, "youtube_search", clean_query, f"Searching YouTube for '{clean_query}'.", True, "Duplicate command suppressed")
+        self._last_search_guard = (clean_query.lower(), now)
 
         encoded = urllib.parse.quote_plus(clean_query)
         search_url = f"https://www.youtube.com/results?search_query={encoded}"

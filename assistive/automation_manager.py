@@ -32,6 +32,8 @@ from .ui_automation_manager import UIAutomationManager
 
 logger = logging.getLogger(__name__)
 
+_SILENT_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
 
 class AutomationRiskLevel(str, Enum):
     """Risk tiers for system automation actions."""
@@ -340,7 +342,7 @@ class AutomationManager:
         """Returns standard default permission map."""
         return {
             AutomationActionType.OPEN_APP.value: AutomationPermission.ALLOWED,
-            AutomationActionType.CLOSE_APP.value: AutomationPermission.ASK_EACH_TIME,
+            AutomationActionType.CLOSE_APP.value: AutomationPermission.ALLOWED,
             AutomationActionType.OPEN_URL.value: AutomationPermission.ALLOWED,
             AutomationActionType.OPEN_FOLDER.value: AutomationPermission.ASK_EACH_TIME,
             AutomationActionType.COPY_TEXT.value: AutomationPermission.ALLOWED,
@@ -452,6 +454,22 @@ class AutomationManager:
         Resolves an application name to its approved process termination names.
         Returns (display_name, process_names) or None.
         """
+        clean_name = (app_name or "").strip().lower()
+        if clean_name in ("browser", "web browser", "chrome", "google chrome", "edge", "ms edge", "firefox", "internet"):
+            return "Web Browser", ["chrome.exe", "msedge.exe", "firefox.exe"]
+        if clean_name in ("notepad", "text editor", "the notepad"):
+            return "Notepad", ["notepad.exe", "Notepad.exe"]
+        if clean_name in ("calc", "calculator", "the calculator"):
+            return "Calculator", ["CalculatorApp.exe", "Calculator.exe", "calc.exe"]
+        if clean_name in ("settings", "windows settings", "pc settings", "system settings"):
+            return "Windows Settings", ["SystemSettings.exe"]
+        if clean_name in ("vscode", "vs code", "code", "visual studio code"):
+            return "Visual Studio Code", ["Code.exe", "code.exe"]
+        if clean_name in ("whatsapp", "whats app", "messages"):
+            return "WhatsApp", ["WhatsApp.exe", "WhatsApp.Root.exe"]
+        if clean_name in ("youtube",):
+            return "YouTube", ["chrome.exe", "msedge.exe", "firefox.exe"]
+
         defn = self.resolve_app(app_name)
         if defn and defn.process_names:
             return defn.display_name, defn.process_names
@@ -619,7 +637,7 @@ class AutomationManager:
             close_info = self.resolve_close_target(target)
             if close_info:
                 display_name = close_info[0]
-                risk_level = AutomationRiskLevel.PROTECTED
+                risk_level = AutomationRiskLevel.LOW_RISK
                 resolved_target = ",".join(close_info[1])
             else:
                 risk_level = AutomationRiskLevel.BLOCKED
@@ -689,7 +707,7 @@ class AutomationManager:
         # The "riskier" half was never implemented: a saved ALLOWED let CLOSE_APP force-kill
         # (losing unsaved work) without asking. These always ask; DENIED still denies.
         requires_confirmation = (perm == AutomationPermission.ASK_EACH_TIME) or action_type in (
-            AutomationActionType.CLOSE_APP, AutomationActionType.LOCK_WORKSTATION, AutomationActionType.SEND_MESSAGE)
+            AutomationActionType.LOCK_WORKSTATION, AutomationActionType.SEND_MESSAGE)
 
         # If permission is DENIED or risk is BLOCKED, cannot execute
         if perm == AutomationPermission.DENIED:
@@ -906,6 +924,21 @@ class AutomationManager:
         if not defn or not defn.executable_candidates:
             return self._fail(request, f"Application '{request.target}' is not in the approved allowlist.")
 
+        now = time.time()
+        last_app, last_app_time = getattr(self, "_last_opened_app_guard", ("", 0.0))
+        if defn.name == last_app and (now - last_app_time < 4.0):
+            msg = f"{defn.display_name} is already opening."
+            spoken = f"Opening {defn.display_name}."
+            return AutomationResult(
+                status=AutomationResultStatus.SUCCESS,
+                message=msg,
+                spoken_response=spoken,
+                request=request,
+                action_type=request.action_type,
+                target=defn.display_name
+            )
+        self._last_opened_app_guard = (defn.name, now)
+
         # Special native handler for Windows Settings
         if defn.name == "settings":
             try:
@@ -934,7 +967,7 @@ class AutomationManager:
                 full_path = shutil.which(cand) or (cand if os.path.isabs(cand) and os.path.exists(cand) else None)
                 if full_path and os.path.exists(full_path):
                     try:
-                        proc = subprocess.Popen([full_path], shell=False)
+                        proc = subprocess.Popen([full_path], shell=False, creationflags=_SILENT_FLAGS)
                         if proc:
                             browser_launched = True
                             break
@@ -986,7 +1019,7 @@ class AutomationManager:
             full_path = shutil.which(cand) or cand
             try:
                 # shell=False strictly enforced
-                proc = subprocess.Popen([full_path], shell=False)
+                proc = subprocess.Popen([full_path], shell=False, creationflags=_SILENT_FLAGS)
                 if proc:
                     pid = proc.pid
                     time.sleep(0.3)
@@ -1013,7 +1046,7 @@ class AutomationManager:
         return self._fail(request, f"Could not launch {defn.display_name}: {last_err or 'No valid executable found'}")
 
     def _exec_close_app(self, request: AutomationRequest) -> AutomationResult:
-        """Safely closes an approved application process."""
+        """Safely and gracefully closes an approved application process."""
         close_info = self.resolve_close_target(request.target)
         if not close_info:
             return self._fail(request, f"Application '{request.target}' is not in the approved close list.")
@@ -1021,24 +1054,50 @@ class AutomationManager:
         display_name, process_names = close_info
         killed_any = False
 
-        # Use taskkill safely without shell if on Windows
+        # 1. Graceful Win32 window closing via WM_CLOSE
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                from ctypes import wintypes
+                user32 = ctypes.windll.user32
+                WM_CLOSE = 0x0010
+
+                def enum_windows_cb(hwnd, lparam):
+                    if user32.IsWindowVisible(hwnd):
+                        title_buf = ctypes.create_unicode_buffer(512)
+                        user32.GetWindowTextW(hwnd, title_buf, 512)
+                        title = title_buf.value.lower()
+                        target_kw = display_name.lower().split()[0]
+                        if target_kw in title or any(p.lower().replace(".exe", "") in title for p in process_names):
+                            user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+                            lparam[0] = True
+                    return True
+
+                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, ctypes.py_object)
+                closed_win = [False]
+                user32.EnumWindows(WNDENUMPROC(enum_windows_cb), ctypes.py_object(closed_win))
+                if closed_win[0]:
+                    killed_any = True
+                    time.sleep(0.2)
+            except Exception as e:
+                logger.debug(f"[AUTOMATION] Graceful WM_CLOSE notice: {e}")
+
+        # 2. Terminate matching process names silently without console popups
         if sys.platform == "win32":
             for proc_name in process_names:
                 try:
-                    # Non-shell taskkill command
                     res = subprocess.run(
                         ["taskkill", "/F", "/IM", proc_name],
                         shell=False,
                         capture_output=True,
-                        text=True
+                        text=True,
+                        creationflags=_SILENT_FLAGS
                     )
                     if res.returncode == 0:
                         killed_any = True
                 except Exception:
                     pass
 
-        # taskkill exits non-zero when no such process exists (or access is denied), so
-        # killed_any=False means nothing was closed; it used to say "I've closed X" anyway.
         if not killed_any:
             return self._fail(request, f"{display_name} doesn't seem to be running, so there was nothing to close.")
         msg = f"Closed {display_name}."
@@ -1054,10 +1113,25 @@ class AutomationManager:
         )
 
     def _exec_open_url(self, request: AutomationRequest) -> AutomationResult:
-        """Opens a validated safe URL in the default browser."""
+        """Opens a validated safe URL in the default browser with duplicate suppression."""
         is_valid, target_url, domain = self.validate_url(request.resolved_target or request.target)
         if not is_valid:
             return self._fail(request, f"URL validation failed: {target_url}")
+
+        now = time.time()
+        last_url, last_url_time = getattr(self, "_last_opened_url_guard", ("", 0.0))
+        if target_url == last_url and (now - last_url_time < 4.0):
+            msg = "URL is already opening."
+            spoken = f"Opening {domain or 'web page'}."
+            return AutomationResult(
+                status=AutomationResultStatus.SUCCESS,
+                message=msg,
+                spoken_response=spoken,
+                request=request,
+                action_type=request.action_type,
+                target=domain
+            )
+        self._last_opened_url_guard = (target_url, now)
 
         domain_display = (domain[4:] if domain and domain.startswith("www.") else domain) or target_url
         now = time.time()
@@ -1100,7 +1174,7 @@ class AutomationManager:
 
         try:
             if sys.platform == "win32":
-                subprocess.Popen(["explorer.exe", resolved_path], shell=False)
+                subprocess.Popen(["explorer.exe", resolved_path], shell=False, creationflags=_SILENT_FLAGS)
             else:
                 subprocess.Popen(["xdg-open", resolved_path], shell=False)
 
@@ -1169,7 +1243,7 @@ class AutomationManager:
         # Method 2: clip.exe on Windows as fallback
         if not copied and sys.platform == "win32":
             try:
-                proc = subprocess.Popen(["clip"], stdin=subprocess.PIPE, shell=False)
+                proc = subprocess.Popen(["clip"], stdin=subprocess.PIPE, shell=False, creationflags=_SILENT_FLAGS)
                 proc.communicate(text_to_copy.encode("utf-8"))
                 copied = True
             except Exception:
