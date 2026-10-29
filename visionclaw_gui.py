@@ -10722,8 +10722,6 @@ class SGCubeApp:
 
 
         self.root.bind("<Escape>", lambda e: self._on_esc_shortcut())
-        self.root.bind("<Control_L>", lambda e: self._on_esc_shortcut())
-        self.root.bind("<Control_R>", lambda e: self._on_esc_shortcut())
 
 
 
@@ -10804,7 +10802,7 @@ class SGCubeApp:
 
 
 
-    def _on_esc_shortcut(self):
+    def _on_esc_shortcut(self, event=None):
 
 
 
@@ -10813,6 +10811,11 @@ class SGCubeApp:
 
 
         self._clear_playback_queue()
+        try:
+            from assistive.audio_output_manager import get_audio_output_manager
+            get_audio_output_manager().stop_speech()
+        except Exception:
+            pass
 
 
 
@@ -10821,6 +10824,7 @@ class SGCubeApp:
 
 
         self.show_context_alert("Speech stopped.", color=COLOR_TEXT_MUTED)
+        return "break" 
 
 
 
@@ -11535,12 +11539,9 @@ class SGCubeApp:
                     self._update_info_strip()
 
                     if getattr(self, "speak_assistive_alerts", True):
-                        try:
-                            import winsound
-                            winsound.MessageBeep(winsound.MB_ICONASTERISK)
-                        except Exception:
-                            pass
-                        self.speak_local_response(payload, is_security=True)
+                        # Speak proactive alert verbally without intrusive Windows hardware beeps
+                        if any(phrase in str(payload).lower() for phrase in ("entered the scene", "approaching you")):
+                            self._speak_local_response(payload, is_security=True)
 
 
 
