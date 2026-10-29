@@ -1796,36 +1796,35 @@ class CommandRouter:
         ])
 
         # 1. Wi-Fi OFF
-        if not is_wifi_informational and any(p in clean_text for p in [
-            "turn off wifi", "turn off wi-fi", "turn off wireless", "turn off wi fi",
-            "turn wifi off", "turn wi-fi off", "turn wireless off", "turn wi fi off",
-            "switch off wifi", "switch off wi-fi", "switch off wireless", "switch off wi fi",
-            "switch wifi off", "switch wi-fi off", "switch wireless off", "switch wi fi off",
-            "disable wifi", "disable wi-fi", "disable wireless", "disable wi fi",
-            "deactivate wifi", "deactivate wi-fi", "deactivate wireless", "deactivate wi fi"
-        ]):
+        if not is_wifi_informational and (
+            re.search(r'^(?:please\s+)?(?:turn|switch|set)\s+(?:the\s+)?(?:wi-?fi|wireless|wi\s+fi)\s+off\b', clean_text) or
+            re.search(r'^(?:please\s+)?(?:turn|switch|set)\s+off\s+(?:the\s+)?(?:wi-?fi|wireless|wi\s+fi)\b', clean_text) or
+            re.search(r'^(?:please\s+)?(?:disable|deactivate)\s+(?:the\s+)?(?:wi-?fi|wireless|wi\s+fi)\b', clean_text) or
+            re.search(r'^(?:wi-?fi|wireless|wi\s+fi)\s+off$', clean_text)
+        ):
             return {"intent": "SYSTEM_WIFI", "target": "wifi", "params": {"action": "off"}}
 
         # 2. Wi-Fi ON
-        if not is_wifi_informational and (any(p in clean_text for p in [
-            "turn on wifi", "turn on wi-fi", "turn on wireless", "turn on wi fi",
-            "turn wifi on", "turn wi-fi on", "turn wireless on", "turn wi fi on",
-            "switch on wifi", "switch on wi-fi", "switch on wireless", "switch on wi fi",
-            "switch wifi on", "switch wi-fi on", "switch wireless on", "switch wi fi on",
-            "enable wifi", "enable wi-fi", "enable wireless", "enable wi fi"
-        ]) or re.search(r'\bactivate\s+(?:wifi|wi-fi|wireless|wi\s+fi)\b', clean_text)):
+        if not is_wifi_informational and (
+            re.search(r'^(?:please\s+)?(?:turn|switch|set)\s+(?:the\s+)?(?:wi-?fi|wireless|wi\s+fi)\s+on\b', clean_text) or
+            re.search(r'^(?:please\s+)?(?:turn|switch|set)\s+on\s+(?:the\s+)?(?:wi-?fi|wireless|wi\s+fi)\b', clean_text) or
+            re.search(r'^(?:please\s+)?(?:enable|activate)\s+(?:the\s+)?(?:wi-?fi|wireless|wi\s+fi)\b', clean_text) or
+            re.search(r'^(?:wi-?fi|wireless|wi\s+fi)\s+on$', clean_text)
+        ):
             return {"intent": "SYSTEM_WIFI", "target": "wifi", "params": {"action": "on"}}
 
-        # 3. Wi-Fi Status Query
-        if not is_wifi_informational and any(p in clean_text for p in [
-            "is wifi on", "is wi-fi on", "is wireless on", "is wi fi on",
-            "is wifi off", "is wi-fi off", "is wireless off", "is wi fi off",
-            "what is the wifi status", "what's the wifi status", "what is the wi-fi status", "what's the wi-fi status",
-            "what is the wireless status", "what's the wireless status",
-            "check wifi", "check wi-fi", "check the wifi", "check the wi-fi", "check wireless",
-            "wifi status", "wi-fi status", "wireless status",
-            "is wifi enabled", "is wi-fi enabled", "is wifi connected", "is wi-fi connected"
-        ]):
+        # 3. Wi-Fi Toggle
+        if not is_wifi_informational and (
+            re.search(r'^(?:please\s+)?(?:toggle|flip)\s+(?:the\s+)?(?:wi-?fi|wireless|wi\s+fi)\b', clean_text) or
+            re.search(r'^(?:turn|switch)\s+(?:the\s+)?(?:wi-?fi|wireless|wi\s+fi)\s+on\s+and\s+off\b', clean_text)
+        ):
+            return {"intent": "SYSTEM_WIFI", "target": "wifi", "params": {"action": "toggle"}}
+
+        # 4. Wi-Fi Status Query
+        if not is_wifi_informational and (
+            re.search(r'^(?:is\s+(?:the\s+)?(?:wi-?fi|wireless|wi\s+fi)|check\s+(?:the\s+)?(?:wi-?fi|wireless|wi\s+fi)|(?:wi-?fi|wireless|wi\s+fi)\s+status|what\s+is\s+(?:the\s+)?(?:wi-?fi|wireless|wi\s+fi)\s+status)', clean_text) or
+            any(p in clean_text for p in ["is wifi enabled", "is wi-fi enabled", "is wifi connected", "is wi-fi connected"])
+        ):
             return {"intent": "SYSTEM_WIFI", "target": "wifi", "params": {"action": "status"}}
 
         # C.5. Bluetooth Wireless Adapter & Device Control
@@ -1834,20 +1833,31 @@ class CommandRouter:
         ])
 
         # 1. Bluetooth OFF
-        if not is_bt_informational and any(p in clean_text for p in [
-            "turn off bluetooth", "turn bluetooth off", "switch off bluetooth", "switch bluetooth off",
-            "disable bluetooth", "deactivate bluetooth", "turn bt off", "turn off bt", "disable bt"
-        ]):
+        if not is_bt_informational and (
+            re.search(r'^(?:please\s+)?(?:turn|switch|set)\s+(?:the\s+)?(?:bluetooth|bt)\s+off\b', clean_text) or
+            re.search(r'^(?:please\s+)?(?:turn|switch|set)\s+off\s+(?:the\s+)?(?:bluetooth|bt)\b', clean_text) or
+            re.search(r'^(?:please\s+)?(?:disable|deactivate)\s+(?:the\s+)?(?:bluetooth|bt)\b', clean_text) or
+            re.search(r'^(?:bluetooth|bt)\s+off$', clean_text)
+        ):
             return {"intent": "SYSTEM_BLUETOOTH", "target": "bluetooth", "params": {"action": "off"}}
 
         # 2. Bluetooth ON
-        if not is_bt_informational and (any(p in clean_text for p in [
-            "turn on bluetooth", "turn bluetooth on", "switch on bluetooth", "switch bluetooth on",
-            "enable bluetooth", "turn bt on", "turn on bt", "enable bt"
-        ]) or re.search(r'\bactivate\s+(?:bluetooth|bt)\b', clean_text)):
+        if not is_bt_informational and (
+            re.search(r'^(?:please\s+)?(?:turn|switch|set)\s+(?:the\s+)?(?:bluetooth|bt)\s+on\b', clean_text) or
+            re.search(r'^(?:please\s+)?(?:turn|switch|set)\s+on\s+(?:the\s+)?(?:bluetooth|bt)\b', clean_text) or
+            re.search(r'^(?:please\s+)?(?:enable|activate)\s+(?:the\s+)?(?:bluetooth|bt)\b', clean_text) or
+            re.search(r'^(?:bluetooth|bt)\s+on$', clean_text)
+        ):
             return {"intent": "SYSTEM_BLUETOOTH", "target": "bluetooth", "params": {"action": "on"}}
 
-        # 3. List Bluetooth Devices
+        # 3. Bluetooth Toggle
+        if not is_bt_informational and (
+            re.search(r'^(?:please\s+)?(?:toggle|flip)\s+(?:the\s+)?(?:bluetooth|bt)\b', clean_text) or
+            re.search(r'^(?:turn|switch)\s+(?:the\s+)?(?:bluetooth|bt)\s+on\s+and\s+off\b', clean_text)
+        ):
+            return {"intent": "SYSTEM_BLUETOOTH", "target": "bluetooth", "params": {"action": "toggle"}}
+
+        # 4. List Bluetooth Devices
         if not is_bt_informational and any(p in clean_text for p in [
             "list bluetooth devices", "list my bluetooth devices", "show bluetooth devices",
             "show my bluetooth devices", "what bluetooth devices are paired", "what bluetooth devices are available",
@@ -1856,15 +1866,14 @@ class CommandRouter:
         ]):
             return {"intent": "SYSTEM_BLUETOOTH", "target": "bluetooth", "params": {"action": "list"}}
 
-        # 4. Bluetooth Status Query
-        if not is_bt_informational and any(p in clean_text for p in [
-            "is bluetooth on", "is bluetooth off", "what is the bluetooth status", "what's the bluetooth status",
-            "check bluetooth", "check the bluetooth", "bluetooth status", "bt status",
-            "is bluetooth enabled", "is bt on", "is bt enabled"
-        ]):
+        # 5. Bluetooth Status Query
+        if not is_bt_informational and (
+            re.search(r'^(?:is\s+(?:the\s+)?(?:bluetooth|bt)|check\s+(?:the\s+)?(?:bluetooth|bt)|(?:bluetooth|bt)\s+status|what\s+is\s+(?:the\s+)?(?:bluetooth|bt)\s+status)', clean_text) or
+            any(p in clean_text for p in ["is bluetooth enabled", "is bt enabled"])
+        ):
             return {"intent": "SYSTEM_BLUETOOTH", "target": "bluetooth", "params": {"action": "status"}}
 
-        # 5. Connect Bluetooth Device
+        # 6. Connect Bluetooth Device
         bt_connect_match = re.search(r'^(?:please\s+)?(?:connect|pair)(?:\s+to|\s+with)?\s+(?:my\s+|the\s+)?([a-zA-Z0-9_\-\s\']+?)(?:\s+via\s+bluetooth|\s+over\s+bluetooth)?$', clean_text)
         if not is_bt_informational and bt_connect_match:
             cand = bt_connect_match.group(1).strip()
@@ -1874,7 +1883,7 @@ class CommandRouter:
                 cand = re.sub(r'^(?:bluetooth\s+device|bluetooth)\s*', '', cand).strip()
                 return {"intent": "SYSTEM_BLUETOOTH", "target": cand or "bluetooth", "params": {"action": "connect", "device": cand}}
 
-        # 6. Disconnect Bluetooth Device
+        # 7. Disconnect Bluetooth Device
         bt_disconnect_match = re.search(r'^(?:please\s+)?(?:disconnect)(?:\s+from)?\s+(?:my\s+|the\s+)?([a-zA-Z0-9_\-\s\']+?)(?:\s+via\s+bluetooth|\s+from\s+bluetooth)?$', clean_text)
         if not is_bt_informational and bt_disconnect_match:
             cand = bt_disconnect_match.group(1).strip()
@@ -1883,6 +1892,39 @@ class CommandRouter:
                     cand = ""
                 cand = re.sub(r'^(?:bluetooth\s+device|bluetooth)\s*', '', cand).strip()
                 return {"intent": "SYSTEM_BLUETOOTH", "target": cand or "bluetooth", "params": {"action": "disconnect", "device": cand}}
+
+        # C.5.5. Airplane Mode / Aeroplane Mode / Flight Mode Control
+        airplane_pat = r'(?:airplane|aeroplane|flight)(?:\s+mode)?'
+        # 1. Airplane Mode Toggle
+        if (
+            re.search(rf'^(?:please\s+)?(?:toggle|flip)\s+(?:the\s+)?{airplane_pat}\b', clean_text) or
+            re.search(rf'^(?:turn|switch)\s+(?:the\s+)?{airplane_pat}\s+on\s+and\s+off\b', clean_text)
+        ):
+            return {"intent": "SYSTEM_AIRPLANE", "target": "airplane", "params": {"action": "toggle"}}
+
+        # 2. Airplane Mode OFF
+        if (
+            re.search(rf'^(?:please\s+)?(?:turn|switch|set)\s+off\s+(?:the\s+)?{airplane_pat}\b', clean_text) or
+            re.search(rf'^(?:please\s+)?(?:turn|switch|set)\s+(?:the\s+)?{airplane_pat}\s+off\b', clean_text) or
+            re.search(rf'^(?:please\s+)?(?:disable|deactivate)\s+(?:the\s+)?{airplane_pat}\b', clean_text) or
+            re.search(rf'^{airplane_pat}\s+off$', clean_text)
+        ):
+            return {"intent": "SYSTEM_AIRPLANE", "target": "airplane", "params": {"action": "off"}}
+
+        # 3. Airplane Mode ON
+        if (
+            re.search(rf'^(?:please\s+)?(?:turn|switch|set)\s+on\s+(?:the\s+)?{airplane_pat}\b', clean_text) or
+            re.search(rf'^(?:please\s+)?(?:turn|switch|set)\s+(?:the\s+)?{airplane_pat}\s+on\b', clean_text) or
+            re.search(rf'^(?:please\s+)?(?:enable|activate)\s+(?:the\s+)?{airplane_pat}\b', clean_text) or
+            re.search(rf'^{airplane_pat}\s+on$', clean_text)
+        ):
+            return {"intent": "SYSTEM_AIRPLANE", "target": "airplane", "params": {"action": "on"}}
+
+        # 4. Airplane Mode Status
+        if (
+            re.search(rf'^(?:is\s+(?:the\s+)?{airplane_pat}|check\s+(?:the\s+)?{airplane_pat}|{airplane_pat}\s+status|what\s+is\s+(?:the\s+)?{airplane_pat}\s+status)', clean_text)
+        ):
+            return {"intent": "SYSTEM_AIRPLANE", "target": "airplane", "params": {"action": "status"}}
 
         # C.6. Windows Dark Mode / Light Mode Control
         if any(p in clean_text for p in [
@@ -1899,7 +1941,7 @@ class CommandRouter:
 
         if any(p in clean_text for p in [
             "turn off dark mode", "turn dark mode off", "disable dark mode", "turn on light mode",
-            "turn light mode on", "enable light mode", "switch to light mode", "light mode on",
+            "turn light mode on", "enable light mode", "switch to light mode", 
             "set light mode", "light theme", "enable light theme", "switch to light theme"
         ]):
             return {"intent": "SYSTEM_DARK_MODE", "target": "dark_mode", "params": {"enabled": False}}

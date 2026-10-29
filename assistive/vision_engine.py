@@ -2589,6 +2589,11 @@ class VisionEngine:
             elif action == "off":
                 ok, is_on, msg = self.system_control.set_wifi_enabled(False)
                 resp = msg
+            elif action == "toggle":
+                ok, is_cur, _ = self.system_control.get_wifi_status()
+                target_state = not is_cur if is_cur is not None else False
+                ok, is_on, msg = self.system_control.set_wifi_enabled(target_state)
+                resp = msg
             else:
                 ok, is_on, msg = self.system_control.get_wifi_status()
                 resp = msg
@@ -2603,6 +2608,11 @@ class VisionEngine:
             elif action == "off":
                 ok, is_on, msg = self.system_control.set_bluetooth_enabled(False)
                 resp = msg
+            elif action == "toggle":
+                ok, is_cur, _ = self.system_control.get_bluetooth_status()
+                target_state = not is_cur if is_cur is not None else False
+                ok, is_on, msg = self.system_control.set_bluetooth_enabled(target_state)
+                resp = msg
             elif action == "list":
                 ok, devs, msg = self.system_control.list_bluetooth_devices()
                 resp = msg
@@ -2616,6 +2626,25 @@ class VisionEngine:
                 resp = msg
             else:
                 ok, is_on, msg = self.system_control.get_bluetooth_status()
+                resp = msg
+            self.response_manager.add_response(resp, priority=2, force=True)
+            return resp
+
+        elif intent == "SYSTEM_AIRPLANE":
+            action = route["params"].get("action", "status")
+            if action == "on":
+                ok, is_on, msg = self.system_control.set_airplane_mode_enabled(True)
+                resp = msg
+            elif action == "off":
+                ok, is_on, msg = self.system_control.set_airplane_mode_enabled(False)
+                resp = msg
+            elif action == "toggle":
+                ok, is_cur, _ = self.system_control.get_airplane_mode_status()
+                target_state = not is_cur if is_cur is not None else True
+                ok, is_on, msg = self.system_control.set_airplane_mode_enabled(target_state)
+                resp = msg
+            else:
+                ok, is_on, msg = self.system_control.get_airplane_mode_status()
                 resp = msg
             self.response_manager.add_response(resp, priority=2, force=True)
             return resp

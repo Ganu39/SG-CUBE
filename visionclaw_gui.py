@@ -15051,6 +15051,17 @@ class SGCubeApp:
                         )
                     ),
                     types.FunctionDeclaration(
+                        name="set_airplane_mode",
+                        description="Controls Airplane Mode / Flight Mode on the computer (turn on, turn off, toggle, or get status).",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "action": types.Schema(type="STRING", description="Action: 'on', 'off', 'toggle', or 'status'")
+                            },
+                            required=["action"]
+                        )
+                    ),
+                    types.FunctionDeclaration(
                         name="manage_bluetooth_device",
                         description="Manages Bluetooth devices (list paired devices, connect to a device, or disconnect a device).",
                         parameters=types.Schema(
@@ -16582,6 +16593,8 @@ class SGCubeApp:
             return "wifi"
         elif fn_name == "set_bluetooth_state":
             return "bluetooth"
+        elif fn_name == "set_airplane_mode":
+            return "airplane_mode"
         elif fn_name == "manage_bluetooth_device":
             return "bluetooth_device"
         elif fn_name == "read_screen":
@@ -17229,8 +17242,25 @@ class SGCubeApp:
                                         cmd = "turn bluetooth on"
                                     elif act == "off":
                                         cmd = "turn bluetooth off"
+                                    elif act == "toggle":
+                                        cmd = "toggle bluetooth"
                                     else:
                                         cmd = "what is the bluetooth status"
+                                    resp = await self._run_tool_in_executor(
+                                        self.engine.process_user_speech_query, cmd, self.active_history_session_id
+                                    )
+                                    result_content = {"status": self._outcome_status(resp), "response": resp}
+
+                                elif fn_name == "set_airplane_mode":
+                                    act = fn_args.get("action", "status")
+                                    if act == "on":
+                                        cmd = "turn airplane mode on"
+                                    elif act == "off":
+                                        cmd = "turn airplane mode off"
+                                    elif act == "toggle":
+                                        cmd = "toggle airplane mode"
+                                    else:
+                                        cmd = "what is the airplane mode status"
                                     resp = await self._run_tool_in_executor(
                                         self.engine.process_user_speech_query, cmd, self.active_history_session_id
                                     )

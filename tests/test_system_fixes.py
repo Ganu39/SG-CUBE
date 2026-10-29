@@ -224,6 +224,50 @@ class TestCloseAppAndSettingsAccessibility(unittest.TestCase):
             self.assertIsNotNone(res)
             self.assertIn("settings", res.lower())
 
+    def test_radio_controls_and_airplane_mode(self):
+        # Bluetooth routing
+        for p in ["turn on bluetooth", "turn on the bluetooth", "bluetooth on"]:
+            r = self.engine.router.route_intent(p)
+            self.assertEqual(r["intent"], "SYSTEM_BLUETOOTH")
+            self.assertEqual(r["params"]["action"], "on")
+
+        for p in ["turn off bluetooth", "turn off the bluetooth", "bluetooth off"]:
+            r = self.engine.router.route_intent(p)
+            self.assertEqual(r["intent"], "SYSTEM_BLUETOOTH")
+            self.assertEqual(r["params"]["action"], "off")
+
+        # Wi-Fi routing
+        for p in ["turn on wifi", "turn on the wifi", "wifi on"]:
+            r = self.engine.router.route_intent(p)
+            self.assertEqual(r["intent"], "SYSTEM_WIFI")
+            self.assertEqual(r["params"]["action"], "on")
+
+        for p in ["turn off wifi", "turn off the wifi", "wifi off"]:
+            r = self.engine.router.route_intent(p)
+            self.assertEqual(r["intent"], "SYSTEM_WIFI")
+            self.assertEqual(r["params"]["action"], "off")
+
+        # Airplane Mode routing
+        for p in ["turn on airplane mode", "turn on flight mode", "airplane mode on", "flight mode on"]:
+            r = self.engine.router.route_intent(p)
+            self.assertEqual(r["intent"], "SYSTEM_AIRPLANE")
+            self.assertEqual(r["params"]["action"], "on")
+
+        for p in ["turn off airplane mode", "turn off flight mode", "airplane mode off", "flight mode off"]:
+            r = self.engine.router.route_intent(p)
+            self.assertEqual(r["intent"], "SYSTEM_AIRPLANE")
+            self.assertEqual(r["params"]["action"], "off")
+
+        for p in ["toggle airplane mode", "toggle flight mode"]:
+            r = self.engine.router.route_intent(p)
+            self.assertEqual(r["intent"], "SYSTEM_AIRPLANE")
+            self.assertEqual(r["params"]["action"], "toggle")
+
+    def test_airplane_mode_execution(self):
+        res = self.engine.process_user_speech_query("is airplane mode on")
+        self.assertIsNotNone(res)
+        self.assertIn("airplane mode", res.lower())
+
     def test_quick_settings_toggles(self):
         res_dark = self.engine.process_user_speech_query("turn on dark mode")
         self.assertIn("dark mode", res_dark.lower())

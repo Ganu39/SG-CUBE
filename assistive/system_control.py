@@ -876,6 +876,66 @@ class SystemControl:
         except Exception as e:
             return False, f"Could not open Night Light settings: {e}"
 
+# =========================================================================
+    # AIRPLANE MODE OPERATIONS
+    # =========================================================================
+
+    def _call_airplane_controller(self, action: str) -> dict:
+        """Helper to invoke assistive/airplane_controller.ps1 safely."""
+        import json
+        ps1_path = os.path.join(os.path.dirname(__file__), "airplane_controller.ps1")
+        if not os.path.exists(ps1_path):
+            return {"success": False, "state": "Error", "error": f"Script not found: {ps1_path}"}
+        try:
+            cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1_path, "-Action", action]
+            out = subprocess.check_output(cmd, text=True, timeout=12, creationflags=_SILENT_FLAGS)
+            return json.loads(out.strip())
+        except Exception as e:
+            return {"success": False, "state": "Error", "error": str(e)}
+
+    def get_airplane_mode_status(self) -> Tuple[bool, Optional[bool], str]:
+        """
+        Check current Airplane Mode state.
+        Returns: (success: bool, is_on: Optional[bool], status_message: str)
+        """
+        if os.name != "nt":
+            return False, None, "Airplane mode control is only supported on Windows."
+        res = self._call_airplane_controller("status")
+        if not res.get("success"):
+            err = res.get("error", "Unknown error")
+            return False, None, f"Airplane mode status check failed: {err}"
+        state_str = res.get("state", "")
+        if state_str == "On":
+            return True, True, "Airplane mode is currently on."
+        elif state_str == "Off":
+            return True, False, "Airplane mode is currently off."
+        else:
+            return True, None, f"Airplane mode status is {state_str}."
+
+    def set_airplane_mode_enabled(self, enabled: bool) -> Tuple[bool, Optional[bool], str]:
+        """
+        Enable or disable Windows Airplane Mode and verify resulting state.
+        Returns: (success: bool, verified_is_on: Optional[bool], message: str)
+        """
+        if os.name != "nt":
+            return False, None, "Airplane mode control is only supported on Windows."
+        action = "on" if enabled else "off"
+        res = self._call_airplane_controller(action)
+        if not res.get("success"):
+            err = res.get("error", "Unknown error")
+            action_word = "enable" if enabled else "disable"
+            return False, None, f"Failed to {action_word} Airplane mode: {err}"
+
+        already = res.get("already", False)
+        if enabled:
+            if already:
+                return True, True, "Airplane mode is already on."
+            return True, True, "Airplane mode is now on."
+        else:
+            if already:
+                return True, False, "Airplane mode is already off."
+            return True, False, "Airplane mode is now off."
+
 # Shared singleton instance
 _GLOBAL_SYSTEM_CONTROL = SystemControl()
 
