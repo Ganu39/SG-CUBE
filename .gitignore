@@ -16,6 +16,7 @@ env/
 .coverage
 htmlcov/
 tests/first_run_test_data/
+tests/test_face_master_data/
 tests/persistence_test_data/
 tests/standalone_backend_tmp/
 

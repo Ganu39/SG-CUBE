@@ -1,5 +1,11 @@
 import os
 import sys
+if sys.stdout is None:
+    try: sys.stdout = open(os.devnull, 'w', encoding='utf-8')
+    except Exception: pass
+if sys.stderr is None:
+    try: sys.stderr = open(os.devnull, 'w', encoding='utf-8')
+    except Exception: pass
 import re
 import time
 
@@ -4236,6 +4242,11 @@ class TurnExecutionTracker:
             if res is None and action_key.startswith("screenshot:"):
                 for k, v in self._executed_actions.items():
                     if k.startswith("screenshot:"):
+                        res = v
+                        break
+            elif res is None and action_key.startswith("youtube:"):
+                for k, v in self._executed_actions.items():
+                    if k.startswith("youtube:") and (("open" in action_key and "open" in k) or action_key == k):
                         res = v
                         break
             tid = self._current_turn_id
@@ -12595,91 +12606,39 @@ class SGCubeApp:
 
 
 
-            python_candidates = [
-
-
-
-                os.path.join(app_dir, "runtime", "Scripts", "python.exe"),
-
-
-
-                os.path.join(app_dir, "runtime", "python.exe"),
-
-
-
-                sys.executable,
-
-
-
-                os.path.join(app_dir, ".venv", "Scripts", "python.exe"),
-
-
-
-            ]
-
-
-
-            python_exe = sys.executable
-
-
-
-            for p in python_candidates:
-
-
-
-                if os.path.exists(p):
-
-
-
-                    python_exe = p
-
-
-
-                    break
-
-
-
-
-
-
-
-            listener_script = os.path.join(app_dir, "wake_listener.py")
-
-
-
-            if os.path.exists(listener_script):
-
-
-
-                DETACHED_PROCESS = 0x00000008
-
-
-
-                CREATE_NEW_PROCESS_GROUP = 0x00000200
-
-
-
+            wake_exe = os.path.join(app_dir, 'SG-CUBE-Wake-Listener.exe')
+            DETACHED_PROCESS = 0x00000008
+            CREATE_NEW_PROCESS_GROUP = 0x00000200
+            if os.path.exists(wake_exe):
                 subprocess.Popen(
-
-
-
-                    [python_exe, listener_script],
-
-
-
+                    [wake_exe],
                     cwd=app_dir,
-
-
-
                     creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
-
-
-
                     close_fds=True
-
-
-
                 )
+            else:
+                python_candidates = [
+                    os.path.join(app_dir, 'runtime', 'Scripts', 'pythonw.exe'),
+                    os.path.join(app_dir, 'runtime', 'pythonw.exe'),
+                    os.path.join(app_dir, '.venv', 'Scripts', 'pythonw.exe'),
+                    os.path.join(app_dir, 'runtime', 'Scripts', 'python.exe'),
+                    os.path.join(app_dir, 'runtime', 'python.exe'),
+                    os.path.join(app_dir, '.venv', 'Scripts', 'python.exe'),
+                    sys.executable,
+                ]
+                python_exe = sys.executable
+                for p in python_candidates:
+                    if os.path.exists(p):
+                        python_exe = p
+                        break
+                listener_script = os.path.join(app_dir, 'wake_listener.py')
+                if os.path.exists(listener_script):
+                    subprocess.Popen(
+                        [python_exe, listener_script],
+                        cwd=app_dir,
+                        creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
+                        close_fds=True
+                    )
 
 
 
@@ -16512,8 +16471,15 @@ class SGCubeApp:
         elif intent == "AUTOMATION_READ_SCREEN":
             return "read_screen"
         elif intent in ("AUTOMATION_OPEN_APP", "APP_CONTROL"):
-            app = params.get("app_name") or target or ""
-            return f"open_app:{SGCubeApp._normalize_app_name(app)}"
+            app = SGCubeApp._normalize_app_name(params.get("app_name") or target or "")
+            if app == "youtube":
+                return "youtube:youtube_open:"
+            return f"open_app:{app}"
+        elif intent == "AUTOMATION_OPEN_URL":
+            url_target = (params.get("url") or target or params.get("target") or "").lower()
+            if "youtube" in url_target:
+                return "youtube:youtube_open:"
+            return f"open_url:{url_target}"
         elif intent == "WEB_SEARCH":
             q = params.get("query") or target or ""
             return f"search_web:{q.strip().lower()}"
@@ -16540,8 +16506,12 @@ class SGCubeApp:
             return f"windows_settings:{p.lower().strip()}"
         elif intent and intent.startswith("NOTEPAD_"):
             return f"notepad:{intent.lower()}:{params.get('action', params.get('text', ''))}"
-        elif intent and intent.startswith("YOUTUBE_"):
-            return f"youtube:{intent.lower()}:{params.get('query', '')}"
+        elif intent and str(intent).startswith("YOUTUBE_"):
+            q = (params.get("query") or params.get("title") or "").lower().strip()
+            return f"youtube:{str(intent).lower()}:{q}"
+        elif intent == "PLAY_MEDIA" and params.get("platform") == "youtube":
+            q = (params.get("query") or params.get("title") or "").lower().strip()
+            return f"youtube:play_media:{q}"
         elif intent and intent.startswith("SCREENSHOT_"):
             return f"screenshot:{intent.lower()}"
         elif intent == "SYSTEM_WINDOW_CONTROL":
@@ -16568,14 +16538,25 @@ class SGCubeApp:
         elif fn_name in ("notepad_control", "write_notepad_text", "open_notepad"):
             return f"notepad:{fn_name}"
         elif fn_name in ("youtube_control", "search_youtube", "open_youtube"):
+            act = (fn_args.get("action") or "").lower().strip()
+            if fn_name == "open_youtube" or act == "open":
+                return "youtube:youtube_open:"
+            elif fn_name == "search_youtube" or act == "search":
+                q = (fn_args.get("query") or "").lower().strip()
+                return f"youtube:youtube_search:{q}" if q else f"youtube:{fn_name}"
+            elif act == "play":
+                q = (fn_args.get("query") or "").lower().strip()
+                return f"youtube:play_media:{q}" if q else f"youtube:{fn_name}"
             return f"youtube:{fn_name}"
         elif fn_name in ("take_screenshot", "screenshot_control"):
             return f"screenshot:{fn_name}"
         elif fn_name in ("window_control", "maximize_window", "minimize_window", "close_window"):
             return f"window:{fn_name}"
         elif fn_name == "open_application":
-            app = fn_args.get("app_name") or ""
-            return f"open_app:{SGCubeApp._normalize_app_name(app)}"
+            app = SGCubeApp._normalize_app_name(fn_args.get("app_name") or "")
+            if app == "youtube":
+                return "youtube:youtube_open:"
+            return f"open_app:{app}"
         elif fn_name == "search_web":
             q = fn_args.get("query") or ""
             return f"search_web:{q.strip().lower()}"
@@ -19324,7 +19305,7 @@ class SGCubeApp:
 
 
 
-        dialog.title("👓 Meta Glass / VisionClaw Bridge")
+        dialog.title("👓 Meta Glass / SG CUBE Bridge")
 
 
 
@@ -23319,14 +23300,14 @@ def _cleanup_stale_instance_on_port(port: int):
 
 
 def _find_sgcube_visible_window():
-    """Returns HWND of visible SG CUBE window if one exists, else None."""
+    """Returns HWND of visible or minimized SG CUBE window if one exists, else None."""
     try:
         import ctypes
         from ctypes import wintypes
         user32 = ctypes.windll.user32
         found_hwnd = [None]
         def enum_cb(hwnd, _):
-            if user32.IsWindowVisible(hwnd):
+            if user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd):
                 length = user32.GetWindowTextLengthW(hwnd)
                 if length > 0:
                     buff = ctypes.create_unicode_buffer(length + 1)
@@ -23335,7 +23316,7 @@ def _find_sgcube_visible_window():
                     if "SG CUBE" in title or "VisionClaw" in title:
                         rect = wintypes.RECT()
                         user32.GetWindowRect(hwnd, ctypes.byref(rect))
-                        if (rect.right - rect.left > 150) and (rect.bottom - rect.top > 150):
+                        if user32.IsIconic(hwnd) or ((rect.right - rect.left > 150) and (rect.bottom - rect.top > 150)):
                             found_hwnd[0] = hwnd
             return True
         WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
@@ -23345,144 +23326,67 @@ def _find_sgcube_visible_window():
         return None
 
 def _check_and_wake_existing_instance() -> bool:
-
-
-
     """
-
-
-
     Checks if a healthy, running SG CUBE instance is active on IPC_PORT_GUI.
-
-
-
     Sends WAKE command and waits for valid 'OK' response.
-
-
-
     Returns True if an active instance acknowledged WAKE (new process should exit).
-
-
-
     Returns False if port is free or if existing process is unresponsive/stale (safe to start).
-
-
-
     """
-
-
-
-        # Clean up any orphaned process holding port 8000 without a visible window
     try:
-        s8000 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s8000.settimeout(0.3)
-        res8000 = s8000.connect_ex(('127.0.0.1', 8000))
-        s8000.close()
-        if res8000 == 0:
-            vis_hwnd = _find_sgcube_visible_window()
-            if not vis_hwnd:
-                print(f"[SINGLE-INSTANCE] Port 8000 is held by an orphaned process with no visible window. Cleaning up...")
-                _cleanup_stale_instance_on_port(8000)
-                time.sleep(0.4)
-    except Exception:
-        pass
-
-    try:
-
-
-
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-
-
-        s.settimeout(0.6)
-
-
-
+        s.settimeout(0.8)
         res = s.connect_ex(('127.0.0.1', IPC_PORT_GUI))
-
-
-
         if res != 0:
-
-
-
             s.close()
-
-
-
+            # If IPC_PORT_GUI is free, check if port 8000 was left orphaned from an aborted crash
+            try:
+                s8000 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s8000.settimeout(0.3)
+                res8000 = s8000.connect_ex(('127.0.0.1', 8000))
+                s8000.close()
+                if res8000 == 0:
+                    vis = _find_sgcube_visible_window()
+                    if not vis:
+                        print(f"[SINGLE-INSTANCE] Port 8000 is orphaned without an active SG CUBE IPC server. Cleaning up...")
+                        _cleanup_stale_instance_on_port(8000)
+                        time.sleep(0.3)
+            except Exception:
+                pass
             return False
-
-
-
-
-
-
 
         # Port is open; send WAKE and wait for acknowledgement
-
-
-
         s.sendall(b"WAKE\n")
-
-
-
         resp = s.recv(1024).decode('utf-8', errors='ignore').strip()
-
-
-
         s.close()
 
-
-
-
-
-
-
         if "OK" in resp:
-            vis_hwnd = _find_sgcube_visible_window()
-            if vis_hwnd:
-                print(f"[SINGLE-INSTANCE] Active visible SG CUBE window found (HWND {vis_hwnd}). Bringing to foreground.")
-                try:
-                    import win32gui, win32con
-                    win32gui.ShowWindow(vis_hwnd, win32con.SW_RESTORE)
-                    win32gui.SetForegroundWindow(vis_hwnd)
-                except Exception:
-                    pass
-                return True
-            else:
-                print(f"[SINGLE-INSTANCE] Port {IPC_PORT_GUI} is held by a background process with no visible window. Terminating stale process...")
-                _cleanup_stale_instance_on_port(IPC_PORT_GUI)
-                time.sleep(0.5)
-                return False
-
-
-
+            # Active instance acknowledged WAKE. Allow it to restore or foreground itself.
+            for _ in range(8):
+                vis_hwnd = _find_sgcube_visible_window()
+                if vis_hwnd:
+                    print(f"[SINGLE-INSTANCE] Active SG CUBE window found (HWND {vis_hwnd}). Bringing to foreground.")
+                    try:
+                        import win32gui, win32con
+                        win32gui.ShowWindow(vis_hwnd, win32con.SW_RESTORE)
+                        win32gui.SetForegroundWindow(vis_hwnd)
+                    except Exception:
+                        pass
+                    break
+                time.sleep(0.2)
+            print("[SINGLE-INSTANCE] WAKE signal accepted by active instance. Exiting secondary process.")
+            return True
         else:
-
-
-
             print(f"[SINGLE-INSTANCE] Port {IPC_PORT_GUI} responded with unexpected: '{resp}'. Treating as stale.")
-
-
-
             _cleanup_stale_instance_on_port(IPC_PORT_GUI)
-
-
-
             return False
 
-
-
     except (socket.timeout, socket.error, ConnectionRefusedError, ConnectionResetError) as e:
-
-
-
         print(f"[SINGLE-INSTANCE] Port {IPC_PORT_GUI} is held but did not respond ({e}). Treating as stale.")
-
-
-
         _cleanup_stale_instance_on_port(IPC_PORT_GUI)
+        return False
+    except Exception as e:
+        print(f"[SINGLE-INSTANCE] Notice during IPC probe: {e}")
+        return False
 
 
 
@@ -23584,7 +23488,10 @@ def main():
         except Exception:
             can_use_webview2 = False
 
-        dist_index = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist", "index.html")
+        base_app_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        dist_index = os.path.join(base_app_dir, "frontend", "dist", "index.html")
+        if not os.path.exists(dist_index) and getattr(sys, 'frozen', False):
+            dist_index = os.path.join(os.path.dirname(sys.executable), "frontend", "dist", "index.html")
         if not can_use_webview2:
             print("[LAUNCH-FALLBACK] Microsoft Edge WebView2 runtime is unavailable. Automatically falling back to Tkinter UI...")
             use_legacy_tk = True
@@ -23613,7 +23520,7 @@ def main():
 
                 tk_thread = threading.Thread(target=run_tk_backend, daemon=True)
                 tk_thread.start()
-                ready_evt.wait(timeout=10.0)
+                ready_evt.wait(timeout=30.0)
 
                 app = app_holder.get("app")
                 root = app_holder.get("root")
@@ -23642,7 +23549,11 @@ def main():
                     os._exit(0)
 
                 window.events.closed += on_webview_closed
-                webview.start(debug=False)
+                icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'SG-CUBE.ico')
+                start_kwargs = {'debug': False}
+                if os.path.exists(icon_path):
+                    start_kwargs['icon'] = icon_path
+                webview.start(**start_kwargs)
                 try:
                     bridge.stop()
                     if app:

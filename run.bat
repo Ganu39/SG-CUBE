@@ -1,6 +1,11 @@
 @echo off
-title SG CUBE
+title SG CUBE 2.5
 cd /d "%~dp0"
+
+if exist "%~dp0SG-CUBE.exe" (
+    "%~dp0SG-CUBE.exe" %*
+    exit /b %ERRORLEVEL%
+)
 
 if exist "%~dp0runtime\Scripts\python.exe" (
     set "PYTHON_EXE=%~dp0runtime\Scripts\python.exe"

@@ -413,9 +413,11 @@ class FaceRecognizer:
 
         # 1. Initialize SOTA Deep YuNet Face Detector
         self.yunet = None
+        import sys
         yunet_candidates = [
             os.path.join(self.models_dir, "face_detection_yunet_2023mar.onnx"),
-            os.path.join(DEFAULT_MODEL_DIR, "face_detection_yunet_2023mar.onnx")
+            os.path.join(DEFAULT_MODEL_DIR, "face_detection_yunet_2023mar.onnx"),
+            os.path.join(getattr(sys, '_MEIPASS', ''), "data", "models", "face_detection_yunet_2023mar.onnx")
         ]
         for candidate in yunet_candidates:
             if os.path.exists(candidate):

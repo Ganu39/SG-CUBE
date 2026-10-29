@@ -171,9 +171,9 @@ class SecurityManager:
         "NOTEPAD_SELECT_ALL": SecurityLevel.SAFE,
         "NOTEPAD_COPY": SecurityLevel.SAFE,
         "NOTEPAD_PASTE": SecurityLevel.SAFE,
-        "NOTEPAD_CLEAR": SecurityLevel.SAFE,
 
         # Protected operations (Single deletion, listings, personal memories, task edits, process closing)
+        "NOTEPAD_CLEAR": SecurityLevel.SAFE,
         "MEMORY_RECALL": SecurityLevel.PROTECTED,
         "MEMORY_LIST": SecurityLevel.PROTECTED,
         "MEMORY_SAVE": SecurityLevel.SAFE,  # Saving facts is safe; recalling/listing is protected

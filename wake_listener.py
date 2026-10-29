@@ -156,7 +156,7 @@ class SGCubeWakeListener:
         menu = pystray.Menu(
             pystray.MenuItem('● Listening for "Hey SG CUBE"', lambda: None, enabled=False),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem('Open VisionClaw', self.manual_open_visionclaw),
+            pystray.MenuItem('Open SG CUBE', self.manual_open_visionclaw),
             pystray.MenuItem('Pause Wake Word', self.toggle_pause_listening, checked=lambda item: self.listening_paused),
             pystray.MenuItem('Start with Windows', self.toggle_windows_startup, checked=lambda item: self.auto_start_enabled),
             pystray.Menu.SEPARATOR,
@@ -191,9 +191,12 @@ class SGCubeWakeListener:
         key = win32api.RegOpenKey(win32con.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, win32con.KEY_WRITE)
 
         if self.auto_start_enabled:
-            # Use the bat file so bundled runtime discovery works correctly on startup.
-            bat_path = os.path.join(self.app_dir, "run_wake_listener.bat")
-            win32api.RegSetValueEx(key, "SGCubeWakeListener", 0, win32con.REG_SZ, f'"{bat_path}"')
+            exe_path = os.path.join(self.app_dir, "SG-CUBE-Wake-Listener.exe")
+            if os.path.exists(exe_path):
+                win32api.RegSetValueEx(key, "SGCubeWakeListener", 0, win32con.REG_SZ, f'"{exe_path}"')
+            else:
+                bat_path = os.path.join(self.app_dir, "run_wake_listener.bat")
+                win32api.RegSetValueEx(key, "SGCubeWakeListener", 0, win32con.REG_SZ, f'"{bat_path}"')
             print("[REGISTRY] Added SGCubeWakeListener to Windows Startup.")
         else:
             try:
@@ -289,20 +292,27 @@ class SGCubeWakeListener:
             return
 
         time.sleep(0.1)
-        python_candidates = [
-            os.path.join(self.app_dir, "runtime", "Scripts", "python.exe"),
-            os.path.join(self.app_dir, "runtime", "python.exe"),
-            sys.executable,
-            os.path.join(self.app_dir, ".venv", "Scripts", "python.exe"),
-        ]
-        python_exe = sys.executable
-        for p in python_candidates:
-            if os.path.exists(p):
-                python_exe = p
-                break
+        app_exe = os.path.join(self.app_dir, "SG-CUBE.exe")
+        if os.path.exists(app_exe):
+            subprocess.Popen([app_exe], cwd=self.app_dir)
+        else:
+            python_candidates = [
+                os.path.join(self.app_dir, "runtime", "Scripts", "pythonw.exe"),
+                os.path.join(self.app_dir, "runtime", "pythonw.exe"),
+                os.path.join(self.app_dir, ".venv", "Scripts", "pythonw.exe"),
+                os.path.join(self.app_dir, "runtime", "Scripts", "python.exe"),
+                os.path.join(self.app_dir, "runtime", "python.exe"),
+                os.path.join(self.app_dir, ".venv", "Scripts", "python.exe"),
+                sys.executable,
+            ]
+            python_exe = sys.executable
+            for p in python_candidates:
+                if os.path.exists(p):
+                    python_exe = p
+                    break
 
-        cmd = [python_exe, os.path.join(self.app_dir, "visionclaw_gui.py")]
-        subprocess.Popen(cmd, cwd=self.app_dir)
+            cmd = [python_exe, os.path.join(self.app_dir, "visionclaw_gui.py")]
+            subprocess.Popen(cmd, cwd=self.app_dir)
 
         print("[MIC_OWNER] MAIN ACTIVE")
         print("[WAKE] APPLICATION READY")
@@ -315,6 +325,12 @@ class SGCubeWakeListener:
 
     def manual_open_visionclaw(self):
         self.launch_or_activate_visionclaw()
+
+    # Canonical SG CUBE 2.5 aliases
+    manual_open_sgcube = manual_open_visionclaw
+    is_sgcube_running = is_visionclaw_running
+    get_sgcube_state = get_visionclaw_state
+    launch_or_activate_sgcube = launch_or_activate_visionclaw
 
     def toggle_pause_listening(self):
         self.listening_paused = not self.listening_paused

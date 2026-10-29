@@ -75,6 +75,13 @@ class MediaController:
 
     def _open_youtube_url(self, url: str) -> None:
         """Navigates the YouTube tab that is already open; opens a new tab only if there is none."""
+        now = time.time()
+        last_url, last_time = getattr(self, '_last_opened_url_info', ("", 0.0))
+        if url == last_url and (now - last_time < 3.0):
+            logger.info("[MEDIA-CONTROLLER] Skipping duplicate navigation for %s within 3.0s", url)
+            return
+        self._last_opened_url_info = (url, now)
+
         if self._focus_youtube_tab():
             ex = self.action_executor
             if ex.hotkey("ctrl", "l").success and ex.type_text(url, interval=0.005).success and ex.press_key("enter").success:
@@ -266,6 +273,12 @@ class MediaController:
         """ Opens YouTube homepage """
         target_url = "https://www.youtube.com"
         logger.info("[MEDIA-CONTROLLER] Opening YouTube")
+        now = time.time()
+        last_url, last_time = getattr(self, '_last_opened_url_info', ("", 0.0))
+        if target_url == last_url and (now - last_time < 3.0):
+            return MediaActionResult(True, "youtube_open", "YouTube", "Opening YouTube.", True, "Focused existing YouTube tab")
+        self._last_opened_url_info = (target_url, now)
+
         if self._focus_youtube_tab():  # don't navigate away from what's already playing
             return MediaActionResult(True, "youtube_open", "YouTube", "YouTube is already open.", True, "Focused existing YouTube tab")
         try:
@@ -273,13 +286,6 @@ class MediaController:
         except Exception as e:
             logger.error("[MEDIA-CONTROLLER] Failed to open YouTube: %s", e)
             return MediaActionResult(False, "youtube_open", None, "Could not open YouTube.")
-
-        time.sleep(1.0)
-        try:
-            from assistive.system_control import get_system_control
-            get_system_control().find_and_focus_window("youtube")
-        except Exception:
-            pass
 
         return MediaActionResult(
             success=True,

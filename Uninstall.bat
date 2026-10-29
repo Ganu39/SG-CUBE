@@ -5,6 +5,8 @@ echo   SG CUBE Uninstaller
 echo ============================================================
 echo.
 echo Closing all running SG CUBE processes...
+taskkill /f /im SG-CUBE.exe >nul 2>&1
+taskkill /f /im SG-CUBE-Wake-Listener.exe >nul 2>&1
 taskkill /f /im pythonw.exe >nul 2>&1
 taskkill /f /im python.exe >nul 2>&1
 
@@ -15,6 +17,8 @@ echo Removing Registry auto-start entry...
 reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "SGCubeWakeListener" /f >nul 2>&1
 
 echo Removing Start Menu and Desktop shortcuts...
+del /f /q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\SG CUBE\*.lnk" >nul 2>&1
+rmdir /s /q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\SG CUBE" >nul 2>&1
 del /f /q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\SG CUBE.lnk" >nul 2>&1
 del /f /q "%USERPROFILE%\Desktop\SG CUBE.lnk" >nul 2>&1
 

@@ -110,6 +110,50 @@ class CaseInsensitiveStr(str):
         return super().__hash__()
 
 
+POPULAR_WEBSITE_ALIASES: Dict[str, str] = {
+    "youtube": "https://www.youtube.com",
+    "github": "https://github.com",
+    "wikipedia": "https://www.wikipedia.org",
+    "wiki": "https://www.wikipedia.org",
+    "reddit": "https://www.reddit.com",
+    "amazon": "https://www.amazon.com",
+    "gmail": "https://mail.google.com",
+    "google mail": "https://mail.google.com",
+    "chatgpt": "https://chatgpt.com",
+    "chat gpt": "https://chatgpt.com",
+    "openai": "https://openai.com",
+    "twitter": "https://x.com",
+    "netflix": "https://www.netflix.com",
+    "linkedin": "https://www.linkedin.com",
+    "facebook": "https://www.facebook.com",
+    "instagram": "https://www.instagram.com",
+    "insta": "https://www.instagram.com",
+    "duckduckgo": "https://duckduckgo.com",
+    "duck duck go": "https://duckduckgo.com",
+    "stackoverflow": "https://stackoverflow.com",
+    "stack overflow": "https://stackoverflow.com",
+    "twitch": "https://www.twitch.tv",
+    "spotify": "https://open.spotify.com",
+    "quora": "https://www.quora.com",
+    "medium": "https://medium.com",
+    "pinterest": "https://www.pinterest.com",
+    "bing": "https://www.bing.com",
+    "yahoo": "https://www.yahoo.com",
+    "cnn": "https://www.cnn.com",
+    "bbc": "https://www.bbc.com",
+    "nytimes": "https://www.nytimes.com",
+    "new york times": "https://www.nytimes.com",
+    "hacker news": "https://news.ycombinator.com",
+    "ebay": "https://www.ebay.com",
+    "walmart": "https://www.walmart.com",
+    "target": "https://www.target.com",
+    "apple": "https://www.apple.com",
+    "microsoft": "https://www.microsoft.com",
+    "whatsapp web": "https://web.whatsapp.com",
+    "web whatsapp": "https://web.whatsapp.com",
+}
+
+
 class CommandRouter:
     """
     Intelligent Intent Parser & Command Router for Voice Queries.
@@ -596,11 +640,14 @@ class CommandRouter:
             r'^(?:please\s+)?clear\s+(?:the\s+)?(?:notepad\s+)?(?:document|notepad|all\s+text(?:\s+in\s+notepad)?|everything(?:\s+in\s+notepad)?|all\s+content)(?:\s+in\s+notepad)?$',
             r'^(?:please\s+)?delete\s+(?:everything(?:\s+in\s+notepad)?|all\s+text(?:\s+in\s+notepad)?|all\s+content(?:\s+in\s+notepad)?|all\s+in\s+notepad)$',
             r'^(?:please\s+)?clear\s+document$',
-            r'^(?:please\s+)?clear\s+notepad$'
+            r'^(?:please\s+)?clear\s+notepad$',
+            r'^(?:please\s+)?(?:delete|clear|erase)\s+(?:all\s+|the\s+|this\s+)?(?:text|document|text\s+document|content|everything|all\s+text|all\s+content)(?:\s+(?:in|from|on)\s+(?:the\s+)?(?:notepad|document|text\s+document))?$',
+            r'^(?:please\s+)?erase\s+(?:the\s+|this\s+)?(?:text|document)$',
+            r'^(?:please\s+)?delete\s+(?:the\s+|this\s+)?text$'
         ]
         ambiguous_negatives = [
             r'\b(?:this|that)\s+(?:word|paragraph|line|sentence|section|item|file)\b',
-            r'^(?:delete|remove|clear)\s+(?:this|that)(?:\s+word)?$',
+            r'^(?:delete|remove|clear)\s+(?:this|that)\s+word$',
             r'\bselected\s+word\b'
         ]
         if not any(re.search(p, clean_text) for p in ambiguous_negatives):
@@ -626,8 +673,8 @@ class CommandRouter:
         if re.search(r'^(?:please\s+)?(?:paste(?:\s+(?:the\s+)?(?:clipboard(?:\s+contents?)?|text|content|here))?)$', clean_text, re.IGNORECASE):
             return {"intent": "NOTEPAD_PASTE", "target": "notepad", "params": {"action": "paste"}}
 
-        # 5. Open Notepad
-        if re.search(r'^(?:please\s+)?(?:open|launch|start)\s+(?:the\s+)?(?:notepad(?:\s+app|\s+application)?|text\s+editor)$', clean_text, re.IGNORECASE):
+        # 5. Open Notepad / Text Document
+        if re.search(r'^(?:please\s+)?(?:(?:open|launch|start|create)\s+(?:a\s+|the\s+)?(?:new\s+)?(?:notepad(?:\s+app|\s+application)?|text\s+editor|text\s+document|text\s+file|document)|(?:new\s+text\s+document))$', clean_text, re.IGNORECASE):
             return {"intent": "AUTOMATION_OPEN_APP", "target": "notepad", "params": {"app_name": "notepad", "target": "notepad"}}
 
         # 6. Write / Type Text
@@ -651,7 +698,7 @@ class CommandRouter:
                 payload = write_match.group(1).strip()
                 into_field = re.search(r'\s+into\s+(?:the\s+)?([a-zA-Z0-9_\s]+)$', payload, re.IGNORECASE)
                 if not into_field:
-                    clean_payload = re.sub(r'\s+in\s+(?:the\s+)?notepad$', '', payload, flags=re.IGNORECASE).strip()
+                    clean_payload = re.sub(r'\s+(?:in|into|inside|on)\s+(?:the\s+|a\s+|new\s+)?(?:notepad(?:\s+document)?|text\s+document|text\s+editor|document|text\s+file)$', '', payload, flags=re.IGNORECASE).strip()
                     if clean_payload:
                         return {"intent": "NOTEPAD_WRITE", "target": "notepad", "params": {"text": clean_payload}}
 
@@ -915,6 +962,9 @@ class CommandRouter:
         forget_match = re.search(r'(?:forget|delete|remove) (?:that|my|the|face of|person)?\s*(.+)', clean_text)
         if forget_match and not any(w in clean_text for w in ["password", "passcode", "security phrase", "security word"]):
             target_str = forget_match.group(1).strip()
+            # Do not hijack document / text clearing
+            if target_str.lower() in ("text", "this text", "the text", "document", "the document", "everything", "all text"):
+                forget_match = None
             if "all faces" in target_str or "everyone" in target_str:
                 return {"intent": "FACE_FORGET_ALL", "target": None, "params": {}}
             elif "face" in clean_text or "person" in clean_text:
@@ -1242,17 +1292,47 @@ class CommandRouter:
                 app_t = "settings"
             return {"intent": "AUTOMATION_CLOSE_APP", "target": app_t, "params": {"app_name": app_t, "target": app_t}}
 
-        # D. Open Application ("Open calculator", "Launch notepad", "Start file explorer", "Open browser", "Open whatsapp", "Open chrome", "Open youtube", "Open github", "Open vscode", "Open settings")
+        # E. Open URL / Website ("Open website google.com", "Open url wikipedia.org", "Go to github.com", "Open site youtube.com", "Visit bbc.co.uk")
+        open_url_match = re.search(
+            r'^(?:please\s+)?(?:open|go\s+to|visit|navigate\s+to)\s+(?:the\s+)?(?:website\s+|site\s+|webpage\s+|url\s+|link\s+)?(https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,12}(?:/[^\s]*)?)$',
+            clean_text
+        )
+        if open_url_match:
+            url_t = open_url_match.group(1).strip()
+            file_exts = {"exe", "bat", "cmd", "py", "txt", "doc", "docx", "pdf", "log", "json", "xml", "lnk", "dll", "msi"}
+            is_file = not (url_t.startswith("http://") or url_t.startswith("https://") or url_t.startswith("www.")) and (url_t.split(".")[-1].lower() in file_exts)
+            if not is_file:
+                return {"intent": "AUTOMATION_OPEN_URL", "target": url_t, "params": {"url": url_t, "target": url_t}}
+
+        # E.1. Explicit Website by name ("Open website reddit", "Go to website bbc", "Visit site espn")
+        explicit_site_match = re.search(
+            r'^(?:please\s+)?(?:open|go\s+to|visit|navigate\s+to)\s+(?:the\s+)?(?:website\s+|site\s+|webpage\s+)([a-zA-Z0-9 \-]+)$',
+            clean_text
+        )
+        if explicit_site_match:
+            site_raw = explicit_site_match.group(1).strip().lower()
+            if site_raw in POPULAR_WEBSITE_ALIASES:
+                target_url = POPULAR_WEBSITE_ALIASES[site_raw]
+            elif "." in site_raw:
+                target_url = site_raw
+            else:
+                clean_name = re.sub(r'\s+', '', site_raw)
+                target_url = f"https://www.{clean_name}.com"
+            return {"intent": "AUTOMATION_OPEN_URL", "target": target_url, "params": {"url": target_url, "target": target_url}}
+
+        # D. Open Application or Known Service ("Open calculator", "Launch notepad", "Start file explorer", "Open browser", "Open whatsapp", "Open chrome", "Open youtube", "Open github", "Open vscode", "Open settings", "Open reddit", "Open wikipedia")
         open_app_match = re.search(
-            r'^(?:please\s+)?(?:open|launch|start)\s+(?:the\s+)?(?:app\s+|application\s+|website\s+|site\s+)?(calculator|calc|notepad|text\s+editor|file\s+explorer|explorer|browser|web\s+browser|chrome|google\s+chrome|edge|firefox|whatsapp|whats\s+app|youtube|github|vscode|vs\s+code|visual\s+studio\s+code|code|settings|windows\s+settings)\b',
+            r'^(?:please\s+)?(?:open|launch|start|go\s+to|visit)\s+(?:the\s+)?(?:app\s+|application\s+|website\s+|site\s+)?(calculator|calc|notepad|text\s+editor|text\s+document|text\s+file|file\s+explorer|explorer|browser|web\s+browser|chrome|google\s+chrome|google|edge|firefox|internet|web|whatsapp|whats\s+app|youtube|github|vscode|vs\s+code|visual\s+studio\s+code|code|settings|windows\s+settings|wikipedia|wiki|reddit|amazon|gmail|google\s+mail|chatgpt|chat\s+gpt|openai|twitter|netflix|linkedin|facebook|instagram|insta|duckduckgo|duck\s+duck\s+go|stackoverflow|stack\s+overflow|twitch|spotify|quora|medium|pinterest|bing|yahoo|cnn|bbc|nytimes|new\s+york\s+times|hacker\s+news|ebay|walmart|apple|microsoft|whatsapp\s+web|web\s+whatsapp)\b',
             clean_text
         )
         if open_app_match:
             app_t = open_app_match.group(1).strip()
             if app_t in ["whats app", "whatsapp"]:
                 app_t = "whatsapp"
-            elif app_t in ["chrome", "google chrome"]:
+            elif app_t in ["chrome", "google chrome", "google", "browser", "web browser", "edge", "firefox", "internet", "web"]:
                 app_t = "browser"
+            elif app_t in ["notepad", "text editor", "text document", "text file"]:
+                app_t = "notepad"
             elif app_t in ["vscode", "vs code", "code", "visual studio code"]:
                 app_t = "vscode"
             elif app_t in ["settings", "windows settings"]:
@@ -1261,6 +1341,9 @@ class CommandRouter:
                 return {"intent": DualYouTubeOpenIntent("YOUTUBE_OPEN"), "target": DualYouTubeTarget("https://www.youtube.com"), "params": {"target": "youtube", "url": "https://www.youtube.com"}}
             elif app_t == "github":
                 return {"intent": "AUTOMATION_OPEN_URL", "target": "https://github.com", "params": {"url": "https://github.com", "target": "https://github.com"}}
+            elif app_t in POPULAR_WEBSITE_ALIASES:
+                target_url = POPULAR_WEBSITE_ALIASES[app_t]
+                return {"intent": "AUTOMATION_OPEN_URL", "target": target_url, "params": {"url": target_url, "target": target_url}}
             return {"intent": "AUTOMATION_OPEN_APP", "target": app_t, "params": {"app_name": app_t, "target": app_t}}
 
         # D.1. Read Screen / Active Window Content ("Read screen", "What is on my screen", "Describe the screen", "Tell me what's on the screen")
@@ -1322,15 +1405,6 @@ class CommandRouter:
                     "target": c_target,
                     "params": {"contact": c_target, "message": m_body, "app": "whatsapp"}
                 }
-
-        # E. Open URL / Website ("Open website google.com", "Open url wikipedia.org", "Go to github.com", "Open site youtube.com")
-        open_url_match = re.search(
-            r'^(?:please\s+)?(?:open|go\s+to|visit|navigate\s+to)\s+(?:website\s+|site\s+|webpage\s+|url\s+|link\s+)?(https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9.\-]+\.(?:com|org|net|edu|gov|io|ai|dev)(?:/[^\s]*)?)$',
-            clean_text
-        )
-        if open_url_match:
-            url_t = open_url_match.group(1).strip()
-            return {"intent": "AUTOMATION_OPEN_URL", "target": url_t, "params": {"url": url_t, "target": url_t}}
 
         # F. Open Safe Folder ("Open documents folder", "Open my downloads", "Open desktop folder", "Open pictures folder")
         open_folder_match = re.search(

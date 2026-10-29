@@ -29,8 +29,11 @@ class BridgeServer:
     def __init__(self, sgcube_app=None, dist_dir: Optional[str] = None):
         self.app_instance = sgcube_app
         if not dist_dir:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            dist_dir = os.path.join(base_dir, "frontend", "dist")
+            base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+            candidate = os.path.join(base_dir, "frontend", "dist")
+            if not os.path.exists(candidate) and getattr(sys, 'frozen', False):
+                candidate = os.path.join(os.path.dirname(sys.executable), "frontend", "dist")
+            dist_dir = candidate
         self.dist_dir = dist_dir
         self.connected_clients: Set[WebSocket] = set()
         self.loop: Optional[asyncio.AbstractEventLoop] = None

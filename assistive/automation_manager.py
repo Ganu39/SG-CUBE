@@ -226,9 +226,18 @@ class AutomationManager:
             description="Default Web Browser",
             default_risk=AutomationRiskLevel.LOW_RISK,
             default_permission=AutomationPermission.ALLOWED,
-            executable_candidates=["msedge.exe", "chrome.exe", "firefox.exe"],
+            executable_candidates=[
+                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+                "msedge.exe",
+                "chrome.exe",
+                "firefox.exe"
+            ],
             process_names=["msedge.exe", "chrome.exe", "firefox.exe"],
-            aliases=["browser", "web browser", "edge", "ms edge", "chrome", "google chrome", "firefox", "internet"]
+            aliases=["browser", "web browser", "edge", "ms edge", "chrome", "google chrome", "google", "firefox", "internet", "web"]
         ),
         "whatsapp": AutomationActionDefinition(
             action_type=AutomationActionType.OPEN_APP,
@@ -406,6 +415,8 @@ class AutomationManager:
         clean = text.strip()
         for pattern in self.PROHIBITED_PATTERNS:
             if re.search(pattern, clean, re.IGNORECASE):
+                if pattern == r'\bpython(?:\.exe)?\b' and re.search(r'\bpython\.(?:org|com|net|io|dev|ai|edu|gov)\b', clean, re.IGNORECASE):
+                    continue
                 return True
         return False
 
@@ -616,7 +627,7 @@ class AutomationManager:
         elif action_type == AutomationActionType.OPEN_URL:
             is_valid, res, domain = self.validate_url(target)
             if is_valid:
-                display_name = domain or target
+                display_name = (domain[4:] if domain and domain.startswith("www.") else domain) or target
                 resolved_target = res
                 risk_level = AutomationRiskLevel.LOW_RISK
             else:
@@ -916,6 +927,40 @@ class AutomationManager:
             except Exception as e:
                 return self._fail(request, f"Could not launch Windows Settings: {e}")
 
+        # Special resilient handler for Web Browser
+        if defn.name == "browser":
+            browser_launched = False
+            for cand in defn.executable_candidates:
+                full_path = shutil.which(cand) or (cand if os.path.isabs(cand) and os.path.exists(cand) else None)
+                if full_path and os.path.exists(full_path):
+                    try:
+                        proc = subprocess.Popen([full_path], shell=False)
+                        if proc:
+                            browser_launched = True
+                            break
+                    except Exception as be:
+                        last_err = str(be)
+            if not browser_launched:
+                try:
+                    import webbrowser
+                    webbrowser.open("https://www.google.com", new=2)
+                    browser_launched = True
+                except Exception as we:
+                    last_err = str(we)
+            if browser_launched:
+                msg = "Opened Web Browser."
+                spoken = "I've opened the web browser for you."
+                self._record_audit(request, AutomationResultStatus.SUCCESS, msg)
+                return AutomationResult(
+                    status=AutomationResultStatus.SUCCESS,
+                    message=msg,
+                    spoken_response=spoken,
+                    request=request,
+                    action_type=request.action_type,
+                    target=defn.display_name,
+                    pid=None
+                )
+
         # Special verified handler for Windows Notepad
         if defn.name == "notepad":
             try:
@@ -1014,10 +1059,26 @@ class AutomationManager:
         if not is_valid:
             return self._fail(request, f"URL validation failed: {target_url}")
 
+        domain_display = (domain[4:] if domain and domain.startswith("www.") else domain) or target_url
+        now = time.time()
+        last_url, last_time = getattr(self, '_last_opened_url_info', ("", 0.0))
+        if target_url == last_url and (now - last_time < 3.0):
+            msg = f"Focused existing {domain_display} browser tab."
+            spoken = f"Opening {domain_display} for you."
+            return AutomationResult(
+                status=AutomationResultStatus.SUCCESS,
+                message=msg,
+                spoken_response=spoken,
+                request=request,
+                action_type=request.action_type,
+                target=domain_display
+            )
+        self._last_opened_url_info = (target_url, now)
+
         try:
             webbrowser.open_new_tab(target_url)
-            msg = f"Opened {domain} in browser."
-            spoken = f"Opening {domain} for you."
+            msg = f"Opened {domain_display} in browser."
+            spoken = f"Opening {domain_display} for you."
             self._record_audit(request, AutomationResultStatus.SUCCESS, msg)
             return AutomationResult(
                 status=AutomationResultStatus.SUCCESS,

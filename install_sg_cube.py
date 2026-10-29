@@ -28,6 +28,7 @@ USERPROFILE = os.environ.get("USERPROFILE", os.path.expanduser("~"))
 DIRECTORIES_TO_SYNC = [
     "assistive",
     "assets",
+    "launcher",
     "web3d",
     "tests"
 ]
@@ -44,7 +45,11 @@ ROOT_FILES_TO_SYNC = [
     "runw.bat",
     "run_wake_listener.bat",
     "Uninstall.bat",
-    "requirements.txt"
+    "requirements.txt",
+    "SG-CUBE.exe",
+    "SG-CUBE-Wake-Listener.exe",
+    "build_desktop_app.bat",
+    "Create-Desktop-Shortcut.bat"
 ]
 
 # Ignore patterns during copy
@@ -185,8 +190,14 @@ def create_windows_shortcuts():
     except Exception:
         desktop_dir = os.path.join(USERPROFILE, "Desktop")
     desk_path = os.path.join(desktop_dir, "SG CUBE.lnk")
+    app_exe = os.path.join(INSTALL_DIR, "SG-CUBE.exe")
+    wake_exe = os.path.join(INSTALL_DIR, "SG-CUBE-Wake-Listener.exe")
+    desk_target = app_exe if os.path.exists(app_exe) else run_bat
+    sm_target = app_exe if os.path.exists(app_exe) else run_bat
+    wake_target = wake_exe if os.path.exists(wake_exe) else wake_bat
+
     desk_link = shell.CreateShortcut(desk_path)
-    desk_link.TargetPath = run_bat
+    desk_link.TargetPath = desk_target
     desk_link.WorkingDirectory = INSTALL_DIR
     if os.path.exists(icon_path):
         desk_link.IconLocation = f"{icon_path},0"
@@ -204,7 +215,7 @@ def create_windows_shortcuts():
 
     # Main App in Start Menu Folder
     sm_link = shell.CreateShortcut(os.path.join(start_menu_folder, "SG CUBE.lnk"))
-    sm_link.TargetPath = run_bat
+    sm_link.TargetPath = sm_target
     sm_link.WorkingDirectory = INSTALL_DIR
     if os.path.exists(icon_path):
         sm_link.IconLocation = f"{icon_path},0"
@@ -213,7 +224,7 @@ def create_windows_shortcuts():
 
     # Wake Listener in Start Menu Folder
     sm_wake_link = shell.CreateShortcut(os.path.join(start_menu_folder, "SG CUBE Wake Listener.lnk"))
-    sm_wake_link.TargetPath = wake_bat
+    sm_wake_link.TargetPath = wake_target
     sm_wake_link.WorkingDirectory = INSTALL_DIR
     if os.path.exists(icon_path):
         sm_wake_link.IconLocation = f"{icon_path},0"
@@ -247,8 +258,9 @@ def configure_registry_autostart():
             0,
             winreg.KEY_SET_VALUE
         )
-        wake_bat = os.path.join(INSTALL_DIR, "run_wake_listener.bat")
-        winreg.SetValueEx(key, "SGCubeWakeListener", 0, winreg.REG_SZ, f'"{wake_bat}"')
+        wake_exe = os.path.join(INSTALL_DIR, "SG-CUBE-Wake-Listener.exe")
+        wake_target = wake_exe if os.path.exists(wake_exe) else os.path.join(INSTALL_DIR, "run_wake_listener.bat")
+        winreg.SetValueEx(key, "SGCubeWakeListener", 0, winreg.REG_SZ, f'"{wake_target}"')
         winreg.CloseKey(key)
         log("4/6", "Registry Run entry configured successfully.")
     except Exception as e:

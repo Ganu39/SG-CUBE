@@ -9,6 +9,12 @@ echo.
 
 cd /d "%~dp0"
 
+REM Ensure native desktop executables exist before deployment
+if not exist "%~dp0SG-CUBE.exe" (
+    echo [INFO] Building native SG CUBE 2.5 desktop executables...
+    call "%~dp0build_desktop_app.bat"
+)
+
 REM Find best available Python runtime
 if exist "%LOCALAPPDATA%\Programs\SG-CUBE\runtime\Scripts\python.exe" (
     set "PYTHON_EXE=%LOCALAPPDATA%\Programs\SG-CUBE\runtime\Scripts\python.exe"

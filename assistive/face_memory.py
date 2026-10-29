@@ -72,9 +72,11 @@ class FaceMemory:
         self.embedding_version = "v2_sface"
         self.embedding_dimension = 128
 
+        import sys
         sface_candidates = [
             os.path.join(self.models_dir, "face_recognition_sface_2021dec.onnx"),
-            os.path.join(DEFAULT_MODEL_DIR, "face_recognition_sface_2021dec.onnx")
+            os.path.join(DEFAULT_MODEL_DIR, "face_recognition_sface_2021dec.onnx"),
+            os.path.join(getattr(sys, '_MEIPASS', ''), "data", "models", "face_recognition_sface_2021dec.onnx")
         ]
         for candidate in sface_candidates:
             if os.path.exists(candidate):

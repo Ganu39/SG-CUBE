@@ -336,14 +336,11 @@ GEMINI_API_KEY_3=your_tertiary_api_key_optional
   ```cmd
   python run_sgcube_web.py
   ```
-* **Standard Desktop Launcher:**
-  ```cmd
-  run.bat
-  ```
-* **Windowless Background Launcher:**
-  ```cmd
-  runw.bat
-  ```
+* **Native Desktop App (Recommended):**
+  Double-click `SG-CUBE.exe` or use the Desktop shortcut created via `Create-Desktop-Shortcut.bat`.
+  - Runs silently with zero black terminal/console popups.
+  - Automatically loads the high-resolution 3D glass cube interface via Edge WebView2.
+  - Enforces single-instance protection with automatic wake-from-sleep and window focusing.
 * **Standby Wake Listener Daemon:**
   ```cmd
   run_wake_listener.bat

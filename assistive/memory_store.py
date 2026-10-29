@@ -25,8 +25,12 @@ DEFAULT_PREFERENCES: Dict[str, Any] = {
     "user_profile_notes": ""
 }
 
+import sys
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DEFAULT_DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+if getattr(sys, 'frozen', False):
+    DEFAULT_DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser(r"~\AppData\Local")), "SG-CUBE", "data")
+else:
+    DEFAULT_DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
 class MemoryStore:
     def __init__(self, base_dir: str = None):

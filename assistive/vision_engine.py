@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 import uuid
 import time
@@ -106,7 +107,24 @@ from .screenshot_controller import get_screenshot_controller, ScreenshotControll
 
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DEFAULT_DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+if getattr(sys, 'frozen', False):
+    _local_appdata = os.environ.get("LOCALAPPDATA", os.path.expanduser(r"~\AppData\Local"))
+    DEFAULT_DATA_DIR = os.path.join(_local_appdata, "SG-CUBE", "data")
+    _bundled_models = os.path.join(getattr(sys, '_MEIPASS', ''), "data", "models")
+    _target_models = os.path.join(DEFAULT_DATA_DIR, "models")
+    if os.path.exists(_bundled_models):
+        os.makedirs(_target_models, exist_ok=True)
+        import shutil
+        for _m in os.listdir(_bundled_models):
+            _src = os.path.join(_bundled_models, _m)
+            _dst = os.path.join(_target_models, _m)
+            if not os.path.exists(_dst) and os.path.isfile(_src):
+                try:
+                    shutil.copy2(_src, _dst)
+                except Exception:
+                    pass
+else:
+    DEFAULT_DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
 class VisionEngine:
     """

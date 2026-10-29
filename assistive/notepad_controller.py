@@ -367,9 +367,12 @@ class NotepadController:
             return False, "No text provided to write.", "Empty text string"
 
         if verify_focus:
-            if not self.ensure_notepad_active(timeout=2.0):
-                print(f"[DIAGNOSTIC:STAGE_10] FAILURE_CONDITION in write_text: ensure_notepad_active returned False")
-                return False, "Notepad is not active. Please open Notepad first.", "Notepad window not active"
+            if not self.ensure_notepad_active(timeout=1.0):
+                # Auto-open Notepad if not active
+                ok_open, _, _ = self.open_notepad(timeout=3.0)
+                if not ok_open or not self.ensure_notepad_active(timeout=1.5):
+                    print(f"[DIAGNOSTIC:STAGE_10] FAILURE_CONDITION in write_text: ensure_notepad_active returned False")
+                    return False, "Notepad is not active. Please open Notepad first.", "Notepad window not active"
 
         edit_h = self._find_edit_control()
         if edit_h:
@@ -420,15 +423,15 @@ class NotepadController:
             _anonymous_ = ('_input',)
             _fields_ = [('type', ctypes.c_ulong), ('_input', _INPUT)]
 
-        def send_unicode_char(ch: str):
+        def send_unicode_char(ch: str) -> bool:
             if ch == '\r':
-                return
+                return True
             if ch == '\n':
                 scan_ret = user32.MapVirtualKeyW(VK_RETURN, 0)
                 user32.keybd_event(VK_RETURN, scan_ret, 0, 0)
-                time.sleep(0.01)
+                time.sleep(0.005)
                 user32.keybd_event(VK_RETURN, scan_ret, KEYEVENTF_KEYUP, 0)
-                return
+                return True
             inp = INPUT()
             inp.type = 1
             inp.ki.wVk = 0
@@ -438,10 +441,11 @@ class NotepadController:
             inp.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
             r2 = user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(INPUT))
             if r1 == 0 or r2 == 0:
-                err = ctypes.windll.kernel32.GetLastError()
-                print(f"[DIAGNOSTIC:STAGE_10] SendInput returned 0, error={err}")
+                return False
+            return True
 
         typed_count = 0
+        sendinput_blocked = False
         try:
             for ch in text:
                 if self._stop_requested:
@@ -449,21 +453,43 @@ class NotepadController:
                     self._stop_requested = False
                     return False, "Typing stopped.", f"Interrupted after {typed_count} characters"
 
-                send_unicode_char(ch)
+                if not send_unicode_char(ch):
+                    sendinput_blocked = True
+                    break
                 typed_count += 1
-                time.sleep(0.005)
+                time.sleep(0.003)
 
-            # Robust fallback for background / subshell execution if SendInput was blocked by OS
-            edit_h = self._find_edit_control()
-            if edit_h:
-                try:
-                    WM_GETTEXTLENGTH = 0x000E
-                    curr_len = user32.SendMessageW(edit_h, WM_GETTEXTLENGTH, 0, 0)
-                    if curr_len == 0 and len(text) > 0:
+            # If SendInput is blocked by OS/UIPI, immediately write directly via edit control / clipboard
+            if sendinput_blocked:
+                edit_h = self._find_edit_control()
+                if edit_h:
+                    try:
                         EM_REPLACESEL = 0x00C2
                         user32.SendMessageW(edit_h, EM_REPLACESEL, True, text)
-                except Exception:
-                    pass
+                        typed_count = len(text)
+                    except Exception:
+                        pass
+                if typed_count == 0:
+                    try:
+                        import pyperclip
+                        orig_clip = pyperclip.paste()
+                        pyperclip.copy(text)
+                        self.paste(verify_focus=False)
+                        pyperclip.copy(orig_clip)
+                        typed_count = len(text)
+                    except Exception:
+                        pass
+            else:
+                edit_h = self._find_edit_control()
+                if edit_h:
+                    try:
+                        WM_GETTEXTLENGTH = 0x000E
+                        curr_len = user32.SendMessageW(edit_h, WM_GETTEXTLENGTH, 0, 0)
+                        if curr_len == 0 and len(text) > 0:
+                            EM_REPLACESEL = 0x00C2
+                            user32.SendMessageW(edit_h, EM_REPLACESEL, True, text)
+                    except Exception:
+                        pass
 
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             self._last_typed_chars = typed_count
@@ -487,8 +513,10 @@ class NotepadController:
             self.release_all_modifiers()
             return False, "Operation stopped.", "Interrupted by user STOP/CANCEL"
 
-        if verify_focus and not self.ensure_notepad_active(timeout=2.0):
-            return False, "Notepad is not active. Please open Notepad first.", "Notepad window not active"
+        if verify_focus and not self.ensure_notepad_active(timeout=1.0):
+            ok_open, _, _ = self.open_notepad(timeout=3.0)
+            if not ok_open or not self.ensure_notepad_active(timeout=1.5):
+                return False, "Notepad is not active. Please open Notepad first.", "Notepad window not active"
 
         edit_h = self._find_edit_control()
         if edit_h:
@@ -535,8 +563,10 @@ class NotepadController:
             self.release_all_modifiers()
             return False, "Operation stopped.", "Interrupted by user STOP/CANCEL"
 
-        if verify_focus and not self.ensure_notepad_active(timeout=2.0):
-            return False, "Notepad is not active. Please open Notepad first.", "Notepad window not active"
+        if verify_focus and not self.ensure_notepad_active(timeout=1.0):
+            ok_open, _, _ = self.open_notepad(timeout=3.0)
+            if not ok_open or not self.ensure_notepad_active(timeout=1.5):
+                return False, "Notepad is not active. Please open Notepad first.", "Notepad window not active"
 
         try:
             import ctypes
@@ -656,8 +686,10 @@ class NotepadController:
             self.release_all_modifiers()
             return False, "Operation stopped.", "Interrupted by user STOP/CANCEL"
 
-        if verify_focus and not self.ensure_notepad_active(timeout=2.0):
-            return False, "Notepad is not active. Please open Notepad first.", "Notepad window not active"
+        if verify_focus and not self.ensure_notepad_active(timeout=1.0):
+            ok_open, _, _ = self.open_notepad(timeout=3.0)
+            if not ok_open or not self.ensure_notepad_active(timeout=1.5):
+                return False, "Notepad is not active. Please open Notepad first.", "Notepad window not active"
 
         edit_h = self._find_edit_control()
         if edit_h:
@@ -668,6 +700,8 @@ class NotepadController:
                 ctypes.windll.user32.SendMessageW(edit_h, EM_SETSEL, 0, -1)
                 WM_CLEAR = 0x0303
                 ctypes.windll.user32.SendMessageW(edit_h, WM_CLEAR, 0, 0)
+                EM_REPLACESEL = 0x00C2
+                ctypes.windll.user32.SendMessageW(edit_h, EM_REPLACESEL, True, "")
             except Exception:
                 pass
 
