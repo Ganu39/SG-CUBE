@@ -1952,6 +1952,62 @@ class VisionEngine:
             self.response_manager.add_response(resp, priority=2, force=True)
             return resp
 
+        elif intent == "PERSON_ALERTS_TOGGLE":
+            en = route.get("params", {}).get("enabled", True)
+            if hasattr(self, 'store') and self.store:
+                self.store.set_setting("speak_assistive_alerts", en)
+            resp = "Person entrance alerts are now enabled." if en else "Person entrance alerts are now muted."
+            self.response_manager.add_response(resp, priority=2, force=True)
+            return resp
+
+        elif intent == "SYSTEM_SILENCE":
+            try:
+                from assistive.audio_output_manager import get_audio_output_manager
+                get_audio_output_manager().stop_speech()
+            except Exception:
+                pass
+            return ""
+
+        elif intent == "SPEECH_RATE_FASTER":
+            try:
+                from assistive.audio_output_manager import get_audio_output_manager
+                mgr = get_audio_output_manager()
+                new_rate = mgr.change_speech_rate(+2)
+                resp = "Speech rate increased."
+            except Exception:
+                resp = "Speech rate updated."
+            self.response_manager.add_response(resp, priority=2, force=True)
+            return resp
+
+        elif intent == "SPEECH_RATE_SLOWER":
+            try:
+                from assistive.audio_output_manager import get_audio_output_manager
+                mgr = get_audio_output_manager()
+                new_rate = mgr.change_speech_rate(-2)
+                resp = "Speech rate decreased."
+            except Exception:
+                resp = "Speech rate updated."
+            self.response_manager.add_response(resp, priority=2, force=True)
+            return resp
+
+        elif intent == "SPEECH_RATE_NORMAL":
+            try:
+                from assistive.audio_output_manager import get_audio_output_manager
+                mgr = get_audio_output_manager()
+                mgr.set_speech_rate(0)
+                resp = "Speech rate set to normal."
+            except Exception:
+                resp = "Speech rate set to normal."
+            self.response_manager.add_response(resp, priority=2, force=True)
+            return resp
+
+        elif intent == "AUTOMATION_READ_ARTICLE":
+            req = self.automation.create_request(AutomationActionType.READ_SCREEN, "article_mode")
+            res = self.automation.execute_request(req)
+            resp = res.spoken_response
+            self.response_manager.add_response(resp, priority=2, force=True)
+            return resp
+
         # --- WINDOWS SETTINGS INTENTS ---
         elif intent == "WINDOWS_SETTINGS" or intent.startswith("WINDOWS_SETTINGS_"):
             page = route.get("params", {}).get("page") or route.get("target") or "main"

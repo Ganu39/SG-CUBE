@@ -87,6 +87,19 @@ class PersonTrack:
     history: collections.deque = field(default_factory=lambda: collections.deque(maxlen=10))
     has_announced_entry: bool = False
     last_event_time: float = 0.0
+    prev_areas: collections.deque = field(default_factory=lambda: collections.deque(maxlen=15))
+
+    def check_approaching(self) -> bool:
+        """ Returns True if track bounding box has expanded rapidly indicating approach """
+        if not hasattr(self, "prev_areas") or len(self.prev_areas) < 6:
+            return False
+        oldest = list(self.prev_areas)[:3]
+        recent = list(self.prev_areas)[-3:]
+        avg_old = sum(oldest) / len(oldest)
+        avg_rec = sum(recent) / len(recent)
+        if avg_old > 0 and (avg_rec / avg_old) >= 1.35 and (self.bounding_box[3] / 480.0) >= 0.28:
+            return True
+        return False
 
     def update(
         self,
@@ -105,6 +118,10 @@ class PersonTrack:
         # Update spatial sectors
         h_img, w_img = max(1, frame_shape[0]), max(1, frame_shape[1])
         x, y, w, h = bbox
+        curr_area = float(w * h)
+        if not hasattr(self, "prev_areas"):
+            self.prev_areas = collections.deque(maxlen=15)
+        self.prev_areas.append(curr_area)
         cx = x + w / 2.0
         cy = y + h / 2.0
         self.center_x = cx / float(w_img)
@@ -383,6 +400,25 @@ class MultiPersonTracker:
                         )
                         events.append(ev)
                         self._announced_events[event_key] = now
+
+                # Check if person is approaching user
+                if track.check_approaching():
+                    is_k = track.identity_state == PersonIdentityState.KNOWN_CONFIRMED and track.identity_name
+                    app_key = f"APPROACH:{track.identity_name if is_k else tid}"
+                    last_app = self._announced_events.get(app_key, 0.0)
+                    if last_app == 0.0 or (now - last_app) > 30.0:
+                        name_str = track.identity_name if is_k else "A person"
+                        ev_app = MultiPersonEvent(
+                            event_type="PERSON_APPROACHING",
+                            track_id=tid,
+                            identity_name=track.identity_name,
+                            identity_state=track.identity_state.value,
+                            sector=track.sector_verbal,
+                            timestamp=now,
+                            spoken_text=f"{name_str} is approaching you, {track.sector_verbal}."
+                        )
+                        events.append(ev_app)
+                        self._announced_events[app_key] = now
 
         # 3. Create new tracks for unmatched detections
         for d_idx, det in enumerate(face_detections):

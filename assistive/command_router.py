@@ -420,6 +420,11 @@ class CommandRouter:
 
         # 0.3. Proactive Assistive Alerts ("Stop proactive alerts", "Pause alerts", "Resume alerts", "Turn off proactive alerts", "Alerts mode minimal", "Alerts status")
         if any(w in clean_text for w in ["alert", "alerts", "proactive alert", "proactive alerts", "notification", "notifications"]):
+            if "person" in clean_text or "people" in clean_text:
+                if any(p in clean_text for p in ["pause", "stop", "silence", "mute", "quiet", "turn off", "disable"]):
+                    return {"intent": "PERSON_ALERTS_TOGGLE", "target": "off", "params": {"enabled": False}}
+                if any(p in clean_text for p in ["resume", "unpause", "turn on", "enable", "start"]):
+                    return {"intent": "PERSON_ALERTS_TOGGLE", "target": "on", "params": {"enabled": True}}
             if any(p in clean_text for p in ["pause", "stop", "silence", "mute", "quiet"]):
                 dur_match = re.search(r'(?:for\s+)?(\d+\s*(?:minutes?|mins?|seconds?|secs?|hours?|hrs?))', clean_text)
                 dur_str = dur_match.group(1).strip() if dur_match else None
@@ -1024,7 +1029,11 @@ class CommandRouter:
                 return {"intent": "MEMORY_RECALL", "target": clean_text, "params": {"query": clean_text}}
 
         # 15. Currency Query
-        if any(p in clean_text for p in ["how much money", "what currency", "how much is this", "what denomination", "rupee note", "banknote"]):
+        if any(p in clean_text for p in [
+            "how much money", "what currency", "how much is this", "what denomination", "rupee note", "banknote",
+            "what note is this", "what note", "identify note", "check note", "check this note", "identify this note",
+            "identify currency", "what note am i holding", "what bill is this", "identify bill"
+        ]):
             return {"intent": "CURRENCY", "target": None, "params": {}}
 
         # 15.5. Intelligent Document Understanding Queries (SG CUBE 2.5 Feature 8)
@@ -1099,10 +1108,17 @@ class CommandRouter:
         ]):
             return {"intent": "DOCUMENT_READ", "target": None, "params": {}}
 
+        # 15.8. Clean Web Article / Story Reader Mode
+        if any(p in clean_text for p in [
+            "read the article", "read article", "read main story", "read this article",
+            "read webpage", "read the webpage", "summarize article", "read story"
+        ]):
+            return {"intent": "AUTOMATION_READ_ARTICLE", "target": None, "params": {}}
+
         # 16. OCR / Text Reading Query (Fallback)
         if any(p in clean_text for p in ["read the sign", "read text", "read label", "what does this say"]) or (
             clean_text in ["read this", "read this out", "read this for me"] or
-            (clean_text.startswith("read this ") and not any(w in clean_text for w in ["chat", "screen", "message", "whatsapp", "doc", "receipt", "bill", "menu", "page", "form"]))
+            (clean_text.startswith("read this ") and not any(w in clean_text for w in ["chat", "screen", "message", "whatsapp", "doc", "receipt", "bill", "menu", "page", "form", "article", "story"]))
         ):
             return {"intent": "OCR", "target": None, "params": {}}
 
@@ -1166,12 +1182,40 @@ class CommandRouter:
             return {"intent": "SETTINGS", "target": "continuous", "params": {"setting": "environment_monitor_enabled", "value": False}}
 
         # 21. Color Identification Query
-        if any(p in clean_text for p in ["what color", "tell me the color", "identify color", "color of this"]):
+        if any(p in clean_text for p in ["what color", "what is the color", "tell me the color", "identify color", "color of this", "check color", "what color is my"]):
             return {"intent": "COLOR_IDENTIFY", "target": None, "params": {}}
 
         # 22. Light Level Check
-        if any(p in clean_text for p in ["are the lights on", "is it dark", "check light level", "how is the light", "is the room lit"]):
+        if any(p in clean_text for p in ["are the lights on", "is it dark", "is the room dark", "check light level", "how is the light", "is the room lit", "check lights", "check room light", "is it bright", "light level"]):
             return {"intent": "LIGHT_LEVEL_CHECK", "target": None, "params": {}}
+
+        # 22.1. Person Alerts Audio Toggle
+        if any(p in clean_text for p in ["disable person alerts", "mute person alerts", "turn off person alerts", "stop person alerts", "turn person alerts off", "stop alerting people"]):
+            return {"intent": "PERSON_ALERTS_TOGGLE", "target": "off", "params": {"enabled": False}}
+
+        if any(p in clean_text for p in ["enable person alerts", "unmute person alerts", "turn on person alerts", "start person alerts", "turn person alerts on", "start alerting people"]):
+            return {"intent": "PERSON_ALERTS_TOGGLE", "target": "on", "params": {"enabled": True}}
+
+        # 22.2. Instant Voice Silence
+        if clean_text in ["stop speaking", "be quiet", "hush", "silence", "stop talking", "shut up", "quiet"]:
+            return {"intent": "SYSTEM_SILENCE", "target": None, "params": {}}
+
+        # 22.3. Speech Rate Adjustments
+        if any(p in clean_text for p in ["speak faster", "increase speech rate", "talk faster", "increase speech speed", "speed up speech", "faster speech"]):
+            return {"intent": "SPEECH_RATE_FASTER", "target": None, "params": {"step": 2}}
+
+        if any(p in clean_text for p in ["speak slower", "decrease speech rate", "talk slower", "decrease speech speed", "slow down speech", "slower speech"]):
+            return {"intent": "SPEECH_RATE_SLOWER", "target": None, "params": {"step": 2}}
+
+        if any(p in clean_text for p in ["normal speech rate", "normal speech speed", "reset speech rate", "reset speech speed", "default speech rate", "default speech speed"]):
+            return {"intent": "SPEECH_RATE_NORMAL", "target": None, "params": {}}
+
+        # 22.4. Clean Web Article / Story Reader Mode
+        if any(p in clean_text for p in [
+            "read the article", "read article", "read main story", "read this article",
+            "read webpage", "read the webpage", "summarize article", "read story"
+        ]):
+            return {"intent": "AUTOMATION_READ_ARTICLE", "target": None, "params": {}}
 
         # 23. Product Scan
         if any(p in clean_text for p in ["scan product", "scan barcode", "scan qr", "read expiration", "expiry date", "what medicine", "is this medicine"]):

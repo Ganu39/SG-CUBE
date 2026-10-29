@@ -144,6 +144,7 @@ class AudioOutputManager:
         self._watchdog_thread.start()
 
         # Dedicated Non-Blocking SAPI TTS Pipeline (SG CUBE Fix 4)
+        self._speech_rate: int = 0
         self._tts_queue: queue.Queue = queue.Queue()
         self._tts_stop_event: threading.Event = threading.Event()
         self._active_sapi_voice = None
@@ -547,6 +548,10 @@ class AudioOutputManager:
                     except Exception:
                         pass
 
+                    try:
+                        voice.Rate = getattr(self, "_speech_rate", 0)
+                    except Exception:
+                        pass
                     # Asynchronous speak flag = 1
                     voice.Speak(text.strip(), 1)
 
@@ -619,6 +624,20 @@ class AudioOutputManager:
     def is_speaking(self) -> bool:
         """ Returns True if local TTS playback is actively speaking """
         return self.arbiter.is_speaking()
+
+    def set_speech_rate(self, rate: int) -> int:
+        """ Sets SAPI speech rate between -10 and +10 (0 is normal) """
+        self._speech_rate = max(-10, min(10, int(rate)))
+        return self._speech_rate
+
+    def get_speech_rate(self) -> int:
+        """ Returns current SAPI speech rate """
+        return getattr(self, "_speech_rate", 0)
+
+    def change_speech_rate(self, delta: int) -> int:
+        """ Adjusts current speech rate by delta """
+        curr = self.get_speech_rate()
+        return self.set_speech_rate(curr + delta)
 
     def is_busy(self) -> bool:
         """ Alias for is_speaking(): Returns True if local TTS or audio output is active """
