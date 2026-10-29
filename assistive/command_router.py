@@ -634,8 +634,8 @@ class CommandRouter:
 
             # General Windows Settings
             if (
-                re.search(rf'{settings_nav_prefixes}(?:windows\s+settings|system\s+settings|pc\s+settings|settings)$', clean_text, re.IGNORECASE) or
-                re.search(r'^(?:windows\s+settings|system\s+settings|pc\s+settings|settings)$', clean_text, re.IGNORECASE)
+                re.search(rf'{settings_nav_prefixes}(?:windows\s+settings|system\s+settings|pc\s+settings|main\s+settings|default\s+settings|settings)$', clean_text, re.IGNORECASE) or
+                re.search(r'^(?:windows\s+settings|system\s+settings|pc\s+settings|main\s+settings|default\s+settings|settings)$', clean_text, re.IGNORECASE)
             ):
                 return {"intent": DualSettingsIntent("WINDOWS_SETTINGS"), "target": DualSettingsTarget("main"), "params": {"page": "main", "query": text}}
 

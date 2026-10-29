@@ -188,19 +188,18 @@ Guidelines:
 
 
 
-6. When the user asks to set, create, change, reset, or remove a voice security password or sensitive password, call the manage_voice_security tool immediately and do not output spoken disclaimers.
-
-7. When the user asks to adjust, check, or change screen brightness or master volume, call set_screen_brightness or set_system_volume.
-
-8. When the user asks to turn Wi-Fi on or off, or check Wi-Fi status, call set_wifi_state.
-
-9. When the user asks to turn Bluetooth on or off, check Bluetooth status, list Bluetooth devices, or connect or disconnect a Bluetooth device, call set_bluetooth_state or manage_bluetooth_device.
-10. When the user asks to read the screen, describe what's on the screen, check the screen, or tell what is displayed on the screen, call read_screen.
-11. When the user gives voice mouse commands (such as moving the mouse, clicking, double clicking, right clicking, scrolling, dragging, or checking cursor position), do not output spoken disclaimers; the local controller handles real Windows mouse events.
-12. When the user asks to open Windows Settings or specific settings pages (such as Wi-Fi settings, Bluetooth settings, display settings, sound settings, accessibility settings, etc.), call open_windows_settings.
-13. When the user asks to open Notepad, write or type text into Notepad, select all, copy text, paste clipboard content, or clear Notepad, call notepad_control or open_notepad.
-14. When the user asks to search YouTube, play a video or music on YouTube, open YouTube, mute or unmute YouTube, skip or seek forward or backward, or close YouTube, call youtube_control.
-15. When the user asks to take a screenshot, capture the screen, or save a screenshot of the active window, call take_screenshot.
+6. When the user explicitly asks to set, change, reset, or remove a voice security password or sensitive password, call the manage_voice_security tool. Do NOT call manage_voice_security for regular commands, closing applications, or general settings.
+7. When the user asks to close, exit, quit, or shut down an application (such as browser, notepad, calculator, settings, vscode, or whatsapp), call close_application immediately.
+8. When the user asks to toggle or set dark mode, night light, or system audio mute/volume, call set_system_setting or set_system_volume.
+9. When the user asks to adjust, check, or change screen brightness or master volume, call set_screen_brightness or set_system_volume.
+10. When the user asks to turn Wi-Fi on or off, or check Wi-Fi status, call set_wifi_state.
+11. When the user asks to turn Bluetooth on or off, check Bluetooth status, list Bluetooth devices, or connect or disconnect a Bluetooth device, call set_bluetooth_state or manage_bluetooth_device.
+12. When the user asks to read the screen, describe what's on the screen, check the screen, or tell what is displayed on the screen, call read_screen.
+13. When the user gives voice mouse commands (such as moving the mouse, clicking, double clicking, right clicking, scrolling, dragging, or checking cursor position), do not output spoken disclaimers; the local controller handles real Windows mouse events.
+14. When the user asks to open Windows Settings or specific settings pages (such as Wi-Fi settings, Bluetooth settings, display settings, sound settings, accessibility settings, etc.), call open_windows_settings.
+15. When the user asks to open Notepad, write or type text into Notepad, select all, copy text, paste clipboard content, or clear Notepad, call notepad_control or open_notepad.
+16. When the user asks to search YouTube, play a video or music on YouTube, open YouTube, mute or unmute YouTube, skip or seek forward or backward, or close YouTube, call youtube_control.
+17. When the user asks to take a screenshot, capture the screen, or save a screenshot of the active window, call take_screenshot.
 """
 
 
@@ -14983,6 +14982,29 @@ class SGCubeApp:
                         )
                     ),
                     types.FunctionDeclaration(
+                        name="close_application",
+                        description="Closes an approved open application on the user's computer, such as Browser, Notepad, Calculator, Settings, VS Code, or WhatsApp.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "app_name": types.Schema(type="STRING", description="The name of the application to close, e.g. 'browser', 'notepad', 'calculator', 'settings', 'vscode', 'whatsapp'.")
+                            },
+                            required=["app_name"]
+                        )
+                    ),
+                    types.FunctionDeclaration(
+                        name="set_system_setting",
+                        description="Toggles or changes Windows system settings such as Dark Mode ('dark_mode'), Night Light ('night_light'), or Master Audio Mute.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "setting": types.Schema(type="STRING", description="The setting to change: 'dark_mode', 'night_light', 'mute'."),
+                                "action": types.Schema(type="STRING", description="Action: 'on', 'off', 'toggle', 'status'.")
+                            },
+                            required=["setting", "action"]
+                        )
+                    ),
+                    types.FunctionDeclaration(
                         name="set_system_volume",
                         description="Controls the master audio volume on the computer (set percentage, increase, decrease, mute, or unmute).",
                         parameters=types.Schema(
@@ -15840,10 +15862,13 @@ class SGCubeApp:
 
 
                                 else:
-
-
-
                                     self.gui_queue.put(("SECURITY_STATUS", "Access denied"))
+                                    if hasattr(self.engine, 'security'):
+                                        self.engine.security.current_state = SecurityState.IDLE
+                                        self.engine.security._pending_action = None
+                                    if hasattr(self.engine, 'audio_arbitrator') and self.engine.audio_arbitrator:
+                                        self.engine.audio_arbitrator.return_to_gemini()
+                                    sec_was_active = False
 
 
 
@@ -16580,6 +16605,13 @@ class SGCubeApp:
             return f"screenshot:{fn_name}"
         elif fn_name in ("window_control", "maximize_window", "minimize_window", "close_window"):
             return f"window:{fn_name}"
+        elif fn_name in ("close_application", "close_app"):
+            app = SGCubeApp._normalize_app_name(fn_args.get("app_name") or "")
+            return f"close_app:{app}"
+        elif fn_name in ("set_system_setting", "toggle_system_setting"):
+            st = (fn_args.get("setting") or "").lower().strip()
+            act = (fn_args.get("action") or "").lower().strip()
+            return f"system_setting:{st}:{act}"
         elif fn_name == "open_application":
             app = SGCubeApp._normalize_app_name(fn_args.get("app_name") or "")
             if app == "youtube":
@@ -17115,6 +17147,29 @@ class SGCubeApp:
                                     )
                                     result_content = {"status": self._outcome_status(resp), "response": resp}
 
+                                elif fn_name in ("close_application", "close_app"):
+                                    app_name = fn_args.get("app_name", "")
+                                    resp = await self._run_tool_in_executor(
+                                        self.engine.process_user_speech_query, f"close {app_name}", self.active_history_session_id
+                                    )
+                                    result_content = {"status": self._outcome_status(resp), "response": resp}
+
+                                elif fn_name in ("set_system_setting", "toggle_system_setting"):
+                                    setting = fn_args.get("setting", "").lower()
+                                    act = fn_args.get("action", "toggle").lower()
+                                    if "dark" in setting:
+                                        cmd = "toggle dark mode" if act == "toggle" else f"turn {act} dark mode"
+                                    elif "night" in setting:
+                                        cmd = "toggle night light" if act == "toggle" else f"turn {act} night light"
+                                    elif "mute" in setting or "sound" in setting:
+                                        cmd = "mute volume" if act in ("on", "mute") else "unmute volume"
+                                    else:
+                                        cmd = f"turn {act} {setting}"
+                                    resp = await self._run_tool_in_executor(
+                                        self.engine.process_user_speech_query, cmd, self.active_history_session_id
+                                    )
+                                    result_content = {"status": self._outcome_status(resp), "response": resp}
+
                                 elif fn_name == "set_system_volume":
                                     act = fn_args.get("action", "get")
                                     val = fn_args.get("value")
@@ -17216,8 +17271,9 @@ class SGCubeApp:
 
                                 elif fn_name in ("open_windows_settings", "open_settings_page"):
                                     p = fn_args.get("page") or "main"
+                                    cmd = "open settings" if p in ("main", "settings", "") else f"open {p} settings"
                                     resp = await self._run_tool_in_executor(
-                                        self.engine.process_user_speech_query, f"open {p} settings", self.active_history_session_id
+                                        self.engine.process_user_speech_query, cmd, self.active_history_session_id
                                     )
                                     result_content = {"status": self._outcome_status(resp), "response": resp}
 

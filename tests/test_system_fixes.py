@@ -186,5 +186,51 @@ class TestSilentWakeListenerStartup(unittest.TestCase):
         self.assertTrue(os.path.exists(vbs_path), f"File not found: {vbs_path}")
 
 
+
+
+class TestCloseAppAndSettingsAccessibility(unittest.TestCase):
+    """Verifies that closing apps and settings do not trigger voice security challenges."""
+
+    @classmethod
+    def setUpClass(cls):
+        from assistive.vision_engine import VisionEngine
+        cls.engine = VisionEngine(data_dir="data")
+
+    def test_close_app_does_not_trigger_voice_auth(self):
+        from assistive.conversation_context import ConversationState
+        from assistive.security_manager import SecurityState
+
+        res = self.engine.process_user_speech_query("close browser")
+        self.assertNotIn("voice password", res.lower())
+        self.assertNotIn("protected action", res.lower())
+        self.assertTrue("closed" in res.lower() or "nothing to close" in res.lower())
+        self.assertNotEqual(self.engine.context.state, ConversationState.SECURITY_CHALLENGE)
+        self.assertEqual(self.engine.security.current_state, SecurityState.IDLE)
+
+    def test_close_notepad_does_not_trigger_voice_auth(self):
+        from assistive.conversation_context import ConversationState
+        from assistive.security_manager import SecurityState
+
+        res = self.engine.process_user_speech_query("close notepad")
+        self.assertNotIn("voice password", res.lower())
+        self.assertNotIn("protected action", res.lower())
+        self.assertTrue("closed" in res.lower() or "nothing to close" in res.lower())
+        self.assertNotEqual(self.engine.context.state, ConversationState.SECURITY_CHALLENGE)
+        self.assertEqual(self.engine.security.current_state, SecurityState.IDLE)
+
+    def test_settings_routing(self):
+        for phrase in ["open settings", "open main settings", "settings"]:
+            res = self.engine.process_user_speech_query(phrase)
+            self.assertIsNotNone(res)
+            self.assertIn("settings", res.lower())
+
+    def test_quick_settings_toggles(self):
+        res_dark = self.engine.process_user_speech_query("turn on dark mode")
+        self.assertIn("dark mode", res_dark.lower())
+
+        res_mute = self.engine.process_user_speech_query("turn off sound")
+        self.assertIn("muted", res_mute.lower())
+
+
 if __name__ == "__main__":
     unittest.main()

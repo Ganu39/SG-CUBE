@@ -1027,11 +1027,7 @@ class VisionEngine:
                 or self.vault.is_sensitive(query)
                 or is_sensitive_personal_info(query)
                 or is_credential_secret(query)
-                or any(w in query.lower() for w in [
-                    "sensitive", "protected", "vault", "atm pin", "pin", "password",
-                    "bank", "account number", "confidential note", "ssn", "passport", "routing",
-                    "secret", "passcode", "code"
-                ])
+                or bool(re.search(r'\b(?:sensitive|protected|vault|atm\s+pin|pin|password|bank|account\s+number|confidential\s+note|ssn|passport|routing|secret|passcode)\b', query.lower()))
             )
             if not is_sensitive_req:
                 level = SecurityLevel.SAFE
@@ -1048,9 +1044,13 @@ class VisionEngine:
                 self.vault.record_exists_for_query(raw_key)
                 or self.vault.is_sensitive(raw_key)
                 or is_sensitive_personal_info(raw_key)
-                or any(w in raw_key.lower() for w in ["sensitive", "protected", "vault", "pin", "password", "bank"])
+                or bool(re.search(r'\b(?:sensitive|protected|vault|pin|password|bank)\b', raw_key.lower()))
             )
             level = SecurityLevel.PROTECTED
+
+        elif intent == "AUTOMATION_CLOSE_APP":
+            # Approved application closing is managed safely by AutomationManager (WM_CLOSE / permissions)
+            level = SecurityLevel.SAFE
 
         if level in (SecurityLevel.PROTECTED, SecurityLevel.HIGH_RISK):
             # Formulate AuthorizationRequest
