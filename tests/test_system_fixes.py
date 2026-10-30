@@ -276,5 +276,72 @@ class TestCloseAppAndSettingsAccessibility(unittest.TestCase):
         self.assertIn("muted", res_mute.lower())
 
 
+
+
+class TestFullscreenFixes(unittest.TestCase):
+    """Verifies fullscreen command routing, HUD icon rendering, and toggle behavior."""
+
+    def setUp(self):
+        self.router = CommandRouter()
+
+    def test_fullscreen_routing(self):
+        for phrase in ["toggle fullscreen", "enter fullscreen", "go full screen", "fullscreen mode", "fullscreen on"]:
+            r = self.router.route_intent(phrase)
+            self.assertEqual(r["intent"], "SYSTEM_FULLSCREEN")
+            self.assertEqual(r["params"]["action"], "toggle")
+
+        for phrase in ["exit fullscreen", "leave fullscreen", "quit fullscreen", "close fullscreen", "fullscreen off"]:
+            r = self.router.route_intent(phrase)
+            self.assertEqual(r["intent"], "SYSTEM_FULLSCREEN")
+            self.assertEqual(r["params"]["action"], "exit")
+
+    def test_fullscreen_hud_icons(self):
+        from visionclaw_gui import GlowingHUDIcon
+        img_fs = GlowingHUDIcon.get_pil_image("fullscreen", 24)
+        self.assertIsNotNone(img_fs)
+        self.assertEqual(img_fs.size, (24, 24))
+
+        img_cs = GlowingHUDIcon.get_pil_image("collapse_screen", 24)
+        self.assertIsNotNone(img_cs)
+        self.assertEqual(img_cs.size, (24, 24))
+
+        img_ef = GlowingHUDIcon.get_pil_image("exit_fullscreen", 24)
+        self.assertIsNotNone(img_ef)
+        self.assertEqual(img_ef.size, (24, 24))
+
+    def test_fullscreen_toggle_logic(self):
+        from visionclaw_gui import SGCubeApp
+
+        # Instantiate a dummy object with mock root to test _toggle_fullscreen logic safely
+        app = object.__new__(SGCubeApp)
+        app.root = MagicMock()
+        app.root.geometry.return_value = "1672x941+100+100"
+        app.root.state.return_value = "normal"
+        app._is_fullscreen = False
+        app._last_applied_geometry = ("1672", "941")
+        app.show_context_alert = MagicMock()
+        app._apply_responsive_layout = MagicMock()
+        app._rescale_camera_preview = MagicMock()
+        app._update_fullscreen_button_ui = MagicMock()
+
+        # 1. Toggle to True
+        app._toggle_fullscreen()
+        self.assertTrue(app._is_fullscreen)
+        app.root.attributes.assert_called_with("-fullscreen", True)
+        self.assertIsNone(app._last_applied_geometry)
+        app._apply_responsive_layout.assert_called()
+        app._rescale_camera_preview.assert_called()
+
+        # 2. Toggle to False
+        app._toggle_fullscreen()
+        self.assertFalse(app._is_fullscreen)
+        app.root.attributes.assert_called_with("-fullscreen", False)
+        app.root.state.assert_called_with("normal")
+
+        # 3. Force exit when already False should be a no-op
+        app._toggle_fullscreen(force_exit=True)
+        self.assertFalse(app._is_fullscreen)
+
+
 if __name__ == "__main__":
     unittest.main()

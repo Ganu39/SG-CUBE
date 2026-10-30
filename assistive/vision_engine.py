@@ -2678,6 +2678,19 @@ class VisionEngine:
             self.response_manager.add_response(resp, priority=2, force=True)
             return resp
 
+        elif intent == "SYSTEM_FULLSCREEN":
+            action = route["params"].get("action", "toggle")
+            from .window_controller import get_window_controller
+            wc = get_window_controller()
+            if action == "exit":
+                res = wc.execute_window_action("restore", "")
+                resp = "Exited fullscreen mode."
+            else:
+                res = wc.execute_window_action("maximize", "")
+                resp = "Fullscreen mode toggled."
+            self.response_manager.add_response(resp, priority=2, force=True)
+            return resp
+
         elif intent == "SYSTEM_WINDOW_CONTROL":
             action = route["params"].get("action", "minimize")
             app_name = route["params"].get("app", "") or route.get("target", "")

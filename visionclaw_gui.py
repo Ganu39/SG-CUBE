@@ -1707,6 +1707,15 @@ class GlowingHUDIcon:
 
             draw.line([(cx + span - corner, cy + span), (cx + span, cy + span), (cx + span, cy + span - corner)], fill=fg_col, width=stroke_w)
 
+        elif name in ("collapse_screen", "exit_fullscreen", "restore_screen", "shrink_screen"):
+            corner = int(S * 0.20)
+            span = int(S * 0.12)
+            outer = int(S * 0.35)
+            draw.line([(cx - outer, cy - span), (cx - span, cy - span), (cx - span, cy - outer)], fill=fg_col, width=stroke_w)
+            draw.line([(cx + outer, cy - span), (cx + span, cy - span), (cx + span, cy - outer)], fill=fg_col, width=stroke_w)
+            draw.line([(cx - outer, cy + span), (cx - span, cy + span), (cx - span, cy + outer)], fill=fg_col, width=stroke_w)
+            draw.line([(cx + outer, cy + span), (cx + span, cy + span), (cx + span, cy + outer)], fill=fg_col, width=stroke_w)
+
 
 
 
@@ -4509,6 +4518,9 @@ class SGCubeApp:
         self._loading_after_id = None
         self._readiness_after_id = None
         self.resize_debounce_job = None
+        self._is_fullscreen = False
+        self._pre_fullscreen_geom = None
+        self._pre_fullscreen_state = "normal"
 
 
 
@@ -6733,7 +6745,11 @@ class SGCubeApp:
 
 
 
-        HUDTooltip(self.btn_fullscreen, "Toggle Fullscreen")
+        self.tooltip_fullscreen = HUDTooltip(self.btn_fullscreen, "Toggle Fullscreen (F11)")
+
+        # Double-click camera preview or viewport to toggle fullscreen
+        self.preview_label.bind("<Double-Button-1>", lambda e: self._toggle_fullscreen())
+        self.cam_viewport.bind("<Double-Button-1>", lambda e: self._toggle_fullscreen())
 
 
 
@@ -7632,19 +7648,100 @@ class SGCubeApp:
 
 
 
-    def _toggle_fullscreen(self):
+    def _toggle_fullscreen(self, force_exit=False):
+        """
+        Toggles full screen mode seamlessly across Windows displays.
+        Invalidates cached layout dimensions, re-renders responsive stage cards,
+        rescales hero camera preview, updates HUD button icons and tooltips,
+        and provides instant Escape and F11 keyboard accessibility.
+        """
+        try:
+            cur_fs = getattr(self, '_is_fullscreen', False)
+            if force_exit and not cur_fs:
+                return
 
+            new_fs = False if force_exit else not cur_fs
 
+            if new_fs:
+                # Capture geometry and window state prior to entering fullscreen
+                try:
+                    self._pre_fullscreen_geom = self.root.geometry()
+                    self._pre_fullscreen_state = self.root.state()
+                except Exception:
+                    pass
 
+                self._is_fullscreen = True
+                try:
+                    self.root.attributes("-fullscreen", True)
+                except Exception as e:
+                    print(f"[FULLSCREEN] attributes(-fullscreen, True) error: {e}; falling back to zoomed state")
+                    try:
+                        self.root.state('zoomed')
+                    except Exception:
+                        pass
+
+                self.show_context_alert("Fullscreen enabled (Press Esc or F11 to exit)", color=COLOR_CYAN_PRIMARY)
+            else:
+                self._is_fullscreen = False
+                try:
+                    self.root.attributes("-fullscreen", False)
+                except Exception as e:
+                    print(f"[FULLSCREEN] attributes(-fullscreen, False) error: {e}")
+
+                # Restore previous state and geometry smoothly
+                saved_state = getattr(self, '_pre_fullscreen_state', 'normal')
+                if saved_state == 'zoomed':
+                    try:
+                        self.root.state('zoomed')
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        self.root.state('normal')
+                    except Exception:
+                        pass
+                    saved_geom = getattr(self, '_pre_fullscreen_geom', None)
+                    if saved_geom:
+                        try:
+                            self.root.geometry(saved_geom)
+                        except Exception:
+                            pass
+
+                self.show_context_alert("Fullscreen exited", color=COLOR_TEXT_MUTED)
+
+            # Invalidate cached layout geometry so _apply_responsive_layout is FORCED to run
+            self._last_applied_geometry = None
+
+            # Update button icon & tooltip
+            self._update_fullscreen_button_ui()
+
+            # Force redraw and camera rescale
+            self.root.update_idletasks()
+            self._apply_responsive_layout()
+            if hasattr(self, '_rescale_camera_preview'):
+                self._rescale_camera_preview()
+
+        except Exception as e:
+            print(f"[FULLSCREEN] Unexpected error during _toggle_fullscreen: {e}")
+
+    def _update_fullscreen_button_ui(self):
+        """ Dynamically updates button image and tooltip to reflect current fullscreen state """
+        if not hasattr(self, 'btn_fullscreen') or not self.btn_fullscreen:
+            return
         is_fs = getattr(self, '_is_fullscreen', False)
-
-
-
-        self._is_fullscreen = not is_fs
-
-
-
-        self.root.attributes("-fullscreen", self._is_fullscreen)
+        icon_name = "collapse_screen" if is_fs else "fullscreen"
+        tip_text = "Exit Fullscreen (Esc or F11)" if is_fs else "Toggle Fullscreen (F11)"
+        try:
+            scale = getattr(self, '_current_scale', None)
+            icon_sz = scale.get('icon_cam_btn', 18) if scale else 18
+            new_img = self._hud_btn_image(icon_name, icon_sz, self.btn_fullscreen)
+            if new_img:
+                self.btn_fullscreen.config(image=new_img)
+                self.btn_fullscreen.image = new_img
+        except Exception:
+            pass
+        if hasattr(self, 'tooltip_fullscreen') and self.tooltip_fullscreen:
+            self.tooltip_fullscreen.text = tip_text
 
 
 
@@ -7886,6 +7983,7 @@ class SGCubeApp:
 
 
         scale = ResponsiveDesignSystem.compute(w, h)
+        self._current_scale = scale
 
 
 
@@ -9159,7 +9257,8 @@ class SGCubeApp:
 
 
 
-            f_img = self._hud_btn_image("fullscreen", scale['icon_cam_btn'], self.btn_fullscreen)
+            icon_name = "collapse_screen" if getattr(self, '_is_fullscreen', False) else "fullscreen"
+            f_img = self._hud_btn_image(icon_name, scale['icon_cam_btn'], self.btn_fullscreen)
 
 
 
@@ -10721,6 +10820,7 @@ class SGCubeApp:
 
 
         self.root.bind("<Escape>", lambda e: self._on_esc_shortcut())
+        self.root.bind("<F11>", lambda e: self._toggle_fullscreen())
 
 
 
@@ -10802,6 +10902,9 @@ class SGCubeApp:
 
 
     def _on_esc_shortcut(self, event=None):
+        if getattr(self, '_is_fullscreen', False):
+            self._toggle_fullscreen(force_exit=True)
+            return "break"
 
 
 
@@ -16578,6 +16681,8 @@ class SGCubeApp:
             return f"youtube:play_media:{q}"
         elif intent and intent.startswith("SCREENSHOT_"):
             return f"screenshot:{intent.lower()}"
+        elif intent == "SYSTEM_FULLSCREEN":
+            return f"fullscreen:{params.get('action', 'toggle')}"
         elif intent == "SYSTEM_WINDOW_CONTROL":
             return f"window:{params.get('action', '')}:{params.get('app', '')}"
         return None
@@ -17169,6 +17274,12 @@ class SGCubeApp:
 
                                 elif fn_name in ("set_system_setting", "toggle_system_setting"):
                                     setting = fn_args.get("setting", "").lower()
+                                    if "fullscreen" in setting or "full screen" in setting:
+                                        act_fs = fn_args.get("action", "toggle").lower()
+                                        force_ex = act_fs in ("off", "exit", "disable", "leave", "quit")
+                                        self.root.after(0, lambda: self._toggle_fullscreen(force_exit=force_ex))
+                                        resp = "Fullscreen mode toggled."
+                                        result_content = {"status": "success", "response": resp}
                                     act = fn_args.get("action", "toggle").lower()
                                     if "dark" in setting:
                                         cmd = "toggle dark mode" if act == "toggle" else f"turn {act} dark mode"

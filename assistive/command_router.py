@@ -1604,6 +1604,22 @@ class CommandRouter:
             if query_t:
                 return {"intent": "WEB_SEARCH", "target": query_t, "params": {"query": query_t}}
 
+        # Fullscreen Controls
+        if any(p in clean_text for p in [
+            "toggle fullscreen", "toggle full screen", "fullscreen mode", "full screen mode",
+            "enter fullscreen", "enter full screen", "go fullscreen", "go full screen",
+            "make it fullscreen", "make it full screen", "make window fullscreen",
+            "open fullscreen", "set fullscreen", "fullscreen on", "full screen on"
+        ]):
+            return {"intent": "SYSTEM_FULLSCREEN", "target": "window", "params": {"action": "toggle"}}
+
+        if any(p in clean_text for p in [
+            "exit fullscreen", "exit full screen", "leave fullscreen", "leave full screen",
+            "quit fullscreen", "quit full screen", "close fullscreen", "turn off fullscreen",
+            "fullscreen off", "full screen off"
+        ]):
+            return {"intent": "SYSTEM_FULLSCREEN", "target": "window", "params": {"action": "exit"}}
+
         # 28. Computer-Use / Desktop Interaction Actions
         # A. Stop / Cancel Computer Action
         if clean_text in ["stop", "cancel", "abort", "halt", "emergency stop"] or any(p in clean_text for p in [
@@ -1628,7 +1644,7 @@ class CommandRouter:
             text.strip(),
             re.IGNORECASE
         )
-        if type_match and not any(w in clean_text for w in ["password", "pin", "credential", "memory", "task"]):
+        if type_match and not any(w in clean_text for w in ["password", "pin", "credential", "memory", "task", "fullscreen", "full screen"]):
             text_to_type = type_match.group(1).strip()
             dest_field = type_match.group(2).strip() if type_match.group(2) else None
             if text_to_type:
@@ -1972,7 +1988,7 @@ class CommandRouter:
         ]):
             return {"intent": "SYSTEM_NIGHT_LIGHT", "target": "night_light", "params": {"enabled": False}}
 
-        # D. Window Management (Minimize, Maximize, Restore, Switch, App Targeting)
+# D. Window Management (Minimize, Maximize, Restore, Switch, App Targeting)
         if any(p in clean_text for p in ["minimize window", "minimize the window", "minimize active window", "minimize this window", "minimize this", "minimize it"]):
             return {"intent": "SYSTEM_WINDOW_CONTROL", "target": "window", "params": {"action": "minimize"}}
         win_app_min = re.search(r'^(?:please\s+)?(?:minimize)\s+(?:the\s+)?([a-zA-Z0-9_\-\s]+?)(?:\s+window)?$', clean_text)
