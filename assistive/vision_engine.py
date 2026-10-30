@@ -554,6 +554,9 @@ class VisionEngine:
         # 1b. Multi-Person Tracking & Event Detection (SG CUBE 2.5 Feature 7)
         person_events = self.person_tracker.update(faces, frame_shape=(h_img, w_img), current_time=time.time())
         for p_evt in person_events:
+            # Suppress person approaching alerts completely per user instruction
+            if getattr(p_evt, "event_type", None) == "PERSON_APPROACHING" or (p_evt.spoken_text and "approaching" in p_evt.spoken_text.lower()):
+                continue
             if p_evt.spoken_text:
                 self.response_manager.add_response(p_evt.spoken_text, priority=2, force=True)
 

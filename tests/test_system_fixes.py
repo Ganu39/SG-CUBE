@@ -342,6 +342,39 @@ class TestFullscreenFixes(unittest.TestCase):
         app._toggle_fullscreen(force_exit=True)
         self.assertFalse(app._is_fullscreen)
 
+    def test_camera_fullscreen_stage_reflow(self):
+        from visionclaw_gui import SGCubeApp
+        app = object.__new__(SGCubeApp)
+        app._is_fullscreen = True
+        app.main_scrollbar = MagicMock()
+        app.main_canvas = MagicMock()
+        app.stage_upper = MagicMock()
+        app.stage_lower = MagicMock()
+        app.hud_env_card = MagicMock()
+        app.hud_obj_card = MagicMock()
+        app.cam_outer_card = MagicMock()
+
+        scale = {'card_gap_x': 10, 'stage_pad_x': 10, 'stage_margin_y': 10, 'stage_gap_y': 10, 'w': 1920, 'h': 1080}
+        app._reflow_stages("WIDE", 1920, 1080, scale)
+
+        # In camera fullscreen mode, side cards and lower stage are hidden
+        app.hud_env_card.grid_remove.assert_called()
+        app.hud_obj_card.grid_remove.assert_called()
+        app.stage_lower.pack_forget.assert_called()
+        # Hero camera outer card spans all 3 columns
+        app.cam_outer_card.grid.assert_called_with(row=0, column=0, columnspan=3, sticky="nsew", padx=0, pady=0)
+
+    def test_person_approaching_suppressed_from_screen(self):
+        from visionclaw_gui import SGCubeApp
+        app = object.__new__(SGCubeApp)
+        app.context_banner = MagicMock()
+        app.context_banner_timer = 0
+
+        # Attempt to show person approaching alert
+        app.show_context_alert("A person is approaching you, directly ahead.")
+        # Banner should NOT be updated because approaching alerts are suppressed
+        app.context_banner.config.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

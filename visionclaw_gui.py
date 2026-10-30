@@ -8578,6 +8578,38 @@ class SGCubeApp:
 
             return
 
+        # CAMERA FULLSCREEN / THEATER MODE: Hero camera occupies 100% of stage
+        if getattr(self, '_is_fullscreen', False):
+            if hasattr(self, 'main_scrollbar') and self.main_scrollbar:
+                self.main_scrollbar.pack_forget()
+            if hasattr(self, 'main_canvas') and self.main_canvas:
+                self.main_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+            # Hide side cards and lower stage
+            if hasattr(self, 'hud_env_card') and self.hud_env_card:
+                self.hud_env_card.grid_remove()
+            if hasattr(self, 'hud_obj_card') and self.hud_obj_card:
+                self.hud_obj_card.grid_remove()
+            if hasattr(self, 'stage_lower') and self.stage_lower:
+                self.stage_lower.pack_forget()
+
+            # Expand stage_upper to fill all available space
+            self.stage_upper.grid_columnconfigure(0, weight=0, minsize=0)
+            self.stage_upper.grid_columnconfigure(1, weight=1, minsize=0)
+            self.stage_upper.grid_columnconfigure(2, weight=0, minsize=0)
+            self.stage_upper.grid_rowconfigure(0, weight=1)
+            self.stage_upper.grid_rowconfigure(1, weight=0)
+            self.stage_upper.pack_configure(fill=tk.BOTH, expand=True, padx=4, pady=(2, 2))
+
+            if hasattr(self, 'cam_outer_card') and self.cam_outer_card:
+                self.cam_outer_card.grid(row=0, column=0, columnspan=3, sticky="nsew", padx=0, pady=0)
+            return
+
+        # RESTORE NORMAL MULTI-CARD DASHBOARD LAYOUT
+        if hasattr(self, 'stage_lower') and self.stage_lower:
+            if not self.stage_lower.winfo_ismapped():
+                self.stage_lower.pack(fill=tk.X, padx=scale['stage_pad_x'], pady=(scale['stage_gap_y'], scale['stage_margin_y']))
+
 
 
 
@@ -9275,6 +9307,19 @@ class SGCubeApp:
 
 
         # 6. Update Card and Viewport Heights and Widths
+        if getattr(self, '_is_fullscreen', False):
+            full_w = max(400, scale['w'] - 16)
+            header_h = scale.get('header_height', 60)
+            footer_h = scale.get('footer_height', 50)
+            full_h = max(300, scale['h'] - header_h - footer_h - 18)
+
+            if hasattr(self, 'cam_outer_card') and self.cam_outer_card:
+                self.cam_outer_card.config(width=full_w, height=full_h)
+            if hasattr(self, 'cam_viewport') and self.cam_viewport:
+                self.cam_viewport.config(width=full_w - 8, height=full_h - 8)
+                self.cam_viewport.pack_propagate(False)
+            return
+
         mode = getattr(self, 'current_layout_mode', 'WIDE')
         upper_h = scale.get('upper_stage_height', scale['camera_height'])
         lower_h = scale.get('lower_stage_height', scale.get('lower_height', 308))
@@ -9562,7 +9607,16 @@ class SGCubeApp:
 
 
 
-        if getattr(self, 'current_layout_mode', 'WIDE') == 'WIDE':
+        if getattr(self, '_is_fullscreen', False):
+            vw = max(320, self.cam_viewport.winfo_width())
+            vh = max(240, self.cam_viewport.winfo_height())
+            if vw < 400 or vh < 300:
+                scale = ResponsiveDesignSystem.compute(self.root.winfo_width(), self.root.winfo_height())
+                header_h = scale.get('header_height', 60)
+                footer_h = scale.get('footer_height', 50)
+                vw = max(400, scale['w'] - 24)
+                vh = max(300, scale['h'] - header_h - footer_h - 22)
+        elif getattr(self, 'current_layout_mode', 'WIDE') == 'WIDE':
             w = self.root.winfo_width()
             h = self.root.winfo_height()
             scale = ResponsiveDesignSystem.compute(w, h)
@@ -11627,6 +11681,8 @@ class SGCubeApp:
 
 
                 elif msg_type == "TRANSCRIPT_ASSISTIVE":
+                    if payload and "approaching" in str(payload).lower() and ("person" in str(payload).lower() or "approaching you" in str(payload).lower()):
+                        continue
 
 
 
@@ -12077,6 +12133,8 @@ class SGCubeApp:
 
 
         """ Temporarily displays a contextual detection banner near the companion core """
+        if text and "approaching" in str(text).lower() and ("person" in str(text).lower() or "approaching you" in str(text).lower()):
+            return
 
 
 

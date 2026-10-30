@@ -61,6 +61,7 @@ class TestBLVPersonEntranceAndApproach(unittest.TestCase):
 
     def test_person_approaching_detection(self):
         """Verify that a rapidly expanding bounding box generates an approach alert."""
+        self.tracker.enable_approach_alerts = True
         # Initial small detections (person far away)
         for i in range(5):
             self.tracker.update(

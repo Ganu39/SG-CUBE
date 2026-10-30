@@ -273,12 +273,14 @@ class MultiPersonTracker:
         min_iou: float = 0.25,
         max_center_distance: float = 120.0,
         lost_timeout: float = 2.0,
-        event_cooldown: float = 15.0
+        event_cooldown: float = 15.0,
+        enable_approach_alerts: bool = False
     ):
         self.min_iou = min_iou
         self.max_center_distance = max_center_distance
         self.lost_timeout = lost_timeout
         self.event_cooldown = event_cooldown
+        self.enable_approach_alerts = enable_approach_alerts
 
         self.tracks: Dict[int, PersonTrack] = {}
         self.next_track_id: int = 1
@@ -402,7 +404,7 @@ class MultiPersonTracker:
                         self._announced_events[event_key] = now
 
                 # Check if person is approaching user
-                if track.check_approaching():
+                if self.enable_approach_alerts and track.check_approaching():
                     is_k = track.identity_state == PersonIdentityState.KNOWN_CONFIRMED and track.identity_name
                     app_key = f"APPROACH:{track.identity_name if is_k else tid}"
                     last_app = self._announced_events.get(app_key, 0.0)
